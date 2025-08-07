@@ -161,7 +161,7 @@
         .visualization-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto auto;
+            grid-template-rows: auto auto auto auto;
             gap: 15px;
             max-height: var(--main-content-height);
             overflow-y: auto;
@@ -588,6 +588,7 @@
         .viz-section:nth-child(3) { animation-delay: 0.3s; }
         .viz-section:nth-child(4) { animation-delay: 0.4s; }
         .viz-section:nth-child(5) { animation-delay: 0.5s; }
+        .viz-section:nth-child(6) { animation-delay: 0.6s; }
         
         /* Responsive Design */
         @media (max-width: 1200px) {
@@ -611,7 +612,7 @@
             
             .visualization-grid {
                 grid-template-columns: 1fr 1fr;
-                grid-template-rows: auto auto auto;
+                grid-template-rows: auto auto auto auto;
                 gap: 10px;
             }
         }
@@ -619,7 +620,7 @@
         @media (max-width: 900px) {
             .visualization-grid {
                 grid-template-columns: 1fr;
-                grid-template-rows: repeat(5, auto);
+                grid-template-rows: repeat(6, auto);
                 gap: 10px;
             }
             
@@ -771,6 +772,13 @@
                         <div class="viz-title">Oracle MSE vs Steps</div>
                         <div class="chart-container">
                             <canvas id="mseChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-section">
+                        <div class="viz-title">Nucleotide Changes vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="changesChart"></canvas>
                         </div>
                     </div>
                     
@@ -1697,6 +1705,41 @@
                     data: { datasets: [] },
                     options: getChartOptions()
                 });
+                
+                // Nucleotide Changes Chart
+                this.charts.changes = new Chart(document.getElementById('changesChart'), {
+                    type: 'line',
+                    data: { datasets: [] },
+                    options: getChartOptions()
+                });
+            }
+            
+            calculateNucleotideChanges(sampleIndex) {
+                if (!this.data || this.data.steps.length < 2) return [];
+                
+                const changes = [];
+                
+                // First step has no previous step to compare to, so 0 changes
+                changes.push(0);
+                
+                // Calculate changes for each subsequent step
+                for (let stepIndex = 1; stepIndex < this.data.steps.length; stepIndex++) {
+                    const currentSequence = this.data.steps[stepIndex].sequences[sampleIndex];
+                    const previousSequence = this.data.steps[stepIndex - 1].sequences[sampleIndex];
+                    
+                    let changeCount = 0;
+                    
+                    // Compare each nucleotide position
+                    for (let i = 0; i < currentSequence.length; i++) {
+                        if (currentSequence[i] !== previousSequence[i]) {
+                            changeCount++;
+                        }
+                    }
+                    
+                    changes.push(changeCount);
+                }
+                
+                return changes;
             }
             
             updateCharts() {
@@ -1706,6 +1749,7 @@
                 const mseData = this.data.steps.map(step => step.oracle_mses[this.currentSample]);
                 const noiseData = this.data.steps.map(step => step.noise_level);
                 const rateData = this.data.steps.map(step => step.noise_rate);
+                const changesData = this.calculateNucleotideChanges(this.currentSample);
                 
                 // Update MSE chart
                 this.charts.mse.data = {
@@ -1742,6 +1786,20 @@
                         data: rateData,
                         borderColor: '#96ceb4',
                         backgroundColor: 'rgba(150, 206, 180, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                };
+                
+                // Update Nucleotide Changes chart
+                this.charts.changes.data = {
+                    labels: steps,
+                    datasets: [{
+                        data: changesData,
+                        borderColor: '#4ecdc4',
+                        backgroundColor: 'rgba(78, 205, 196, 0.1)',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
