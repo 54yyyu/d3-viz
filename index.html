@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3-DNA Diffusion Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/h5wasm@0.4.9/dist/esm/hdf5.js"></script>
+    <script src="bundle.js" type="text/javascript"></script>
+    <style>
+        /* Theme variables */
+        :root {
+            /* Dark theme (default) */
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #1e1e1e;
+            --bg-quaternary: #0f0f0f;
+            --text-primary: #ffffff;
+            --text-secondary: #888;
+            --accent-primary: #00d4ff;
+            --border-color: #333;
+            --input-bg: #333;
+            --input-hover-bg: #555;
+            --base-a-color: #ff6b6b;
+            --base-c-color: #4ecdc4;
+            --base-g-color: #45b7d1;
+            --base-t-color: #96ceb4;
+        }
+        
+        [data-theme="light"] {
+            /* Light theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --bg-quaternary: #f5f5f5;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --accent-primary: #0056b3;
+            --border-color: #dee2e6;
+            --input-bg: #e9ecef;
+            --input-hover-bg: #dee2e6;
+            --base-a-color: #d63031;
+            --base-c-color: #00b894;
+            --base-g-color: #0984e3;
+            --base-t-color: #00a085;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 60px 1fr 80px;
+            height: 100vh;
+            gap: 1px;
+            background: var(--bg-secondary);
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+        
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-panel {
+            background: var(--bg-quaternary);
+            overflow: hidden;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .controls {
+            grid-column: 1 / -1;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 15px;
+            position: sticky;
+            bottom: 0;
+            z-index: 100;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar-section {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .sidebar-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .sample-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: var(--sidebar-content-height);
+        }
+        
+        .sample-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            border: 1px solid transparent;
+        }
+        
+        .sample-item:hover {
+            background: var(--input-hover-bg);
+            border-color: var(--border-color);
+            transform: translateX(2px);
+        }
+        
+        .sample-item.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+            font-weight: 600;
+            transform: translateX(4px);
+        }
+        
+        /* Main Panel Styles */
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 15px;
+            max-height: var(--main-content-height);
+            overflow-y: auto;
+        }
+        
+        .viz-section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+        
+        .viz-section:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(0, 212, 255, 0.1);
+        }
+        
+        .viz-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sequence-display {
+            grid-column: 1 / -1;
+        }
+        
+        .score-matrix-section {
+            grid-column: 1 / -1;
+        }
+        
+        .sequence-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .sequence-scroll-container {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+        
+        .sequence-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: max-content;
+            min-width: 100%;
+        }
+        
+        .position-axis {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: var(--text-secondary);
+            padding: 4px 10px 8px 10px;
+            white-space: nowrap;
+            border-top: 1px solid var(--border-color);
+            margin-top: 4px;
+        }
+        
+        .sequence-section {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .sequence-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+        }
+        
+        .sequence-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: nowrap;
+            background: transparent;
+            padding: 8px 10px;
+            border: none;
+            overflow: visible;
+        }
+        
+        .sequence-text-single {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: nowrap;
+            background: var(--bg-primary);
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            height: 60px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        
+        .base-A { color: var(--base-a-color); }
+        .base-C { color: var(--base-c-color); }
+        .base-G { color: var(--base-g-color); }
+        .base-T { color: var(--base-t-color); }
+        
+        .matrix-controls {
+            margin-bottom: 10px;
+        }
+        
+        .toggle-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 10px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .toggle-btn:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .toggle-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+        
+        .matrix-display {
+            overflow-x: auto;
+            max-height: 250px; /* Much taller to accommodate larger logo */
+        }
+        
+        .heatmap-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+        
+        .logo-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+        
+        .heatmap-legend {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 8px;
+            gap: 4px;
+            font-size: 10px;
+        }
+        
+        .legend-gradient {
+            width: 200px;
+            height: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 202px;
+            color: var(--text-secondary);
+        }
+        
+        .tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 11px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .chart-container {
+            height: var(--chart-height);
+            position: relative;
+        }
+        
+        /* Control Styles */
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+        }
+        
+        .control-btn:hover::before {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .control-btn > * {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .control-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .step-slider {
+            flex: 1;
+            height: 4px;
+            background: var(--input-bg);
+            border-radius: 2px;
+            outline: none;
+            margin: 0 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .step-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .step-slider::-webkit-slider-thumb:hover {
+            width: 20px;
+            height: 20px;
+            box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.2);
+        }
+        
+        .step-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        
+        .step-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 120px;
+        }
+        
+        .theme-toggle {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 16px;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--input-hover-bg);
+        }
+        
+        .file-input {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .file-input::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .file-input:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+        }
+        
+        .file-input:hover::before {
+            left: 100%;
+        }
+        
+        /* Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--input-bg);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+            box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3);
+        }
+        
+        .stats-display {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 40px;
+            font-size: 14px;
+        }
+        
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .viz-section {
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        .viz-section:nth-child(1) { animation-delay: 0.1s; }
+        .viz-section:nth-child(2) { animation-delay: 0.2s; }
+        .viz-section:nth-child(3) { animation-delay: 0.3s; }
+        .viz-section:nth-child(4) { animation-delay: 0.4s; }
+        .viz-section:nth-child(5) { animation-delay: 0.5s; }
+        
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 240px 1fr;
+            }
+            
+            .visualization-grid {
+                gap: 15px;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 220px 1fr;
+            }
+            
+            .main-panel {
+                padding: 12px;
+            }
+            
+            .visualization-grid {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto auto;
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .visualization-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(5, auto);
+                gap: 10px;
+            }
+            
+            .sequence-display,
+            .score-matrix-section {
+                grid-column: 1;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 60px auto 1fr 80px;
+            }
+            
+            .sidebar {
+                grid-row: 2;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            
+            .main-panel {
+                grid-row: 3;
+                padding: 8px;
+            }
+            
+            .controls {
+                grid-row: 4;
+                flex-wrap: wrap;
+                padding: 10px;
+                gap: 8px;
+            }
+            
+            .step-slider {
+                flex: 1 1 100%;
+                margin: 5px 0;
+            }
+            
+            .sequence-container {
+                gap: 10px;
+            }
+            
+            .sequence-text {
+                font-size: 10px;
+                max-height: 100px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header {
+                padding: 0 10px;
+            }
+            
+            .header h1 {
+                font-size: 16px;
+            }
+            
+            .file-input {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+            
+            .control-btn {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .viz-title {
+                font-size: 12px;
+            }
+            
+            .viz-section {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧬 D3-DNA Diffusion Visualizer</h1>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
+                <button class="theme-toggle" id="themeToggle" title="Toggle Light/Dark Mode">
+                    <span id="themeIcon">☀️</span>
+                </button>
+                <input type="file" id="fileInput" accept=".h5,.hdf5,.json" style="display: none;">
+                <button class="file-input" onclick="document.getElementById('fileInput').click()">
+                    Load Data
+                </button>
+            </div>
+        </header>
+        
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Dataset Info</div>
+                <div id="datasetInfo" class="stats-display">No data loaded</div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="sidebar-title">Samples</div>
+            </div>
+            
+            <div class="sample-list" id="sampleList">
+                <div class="loading">Load a data file to begin</div>
+            </div>
+        </aside>
+        
+        <main class="main-panel">
+            <div id="mainContent" class="hidden">
+                <div class="visualization-grid">
+                    <div class="viz-section sequence-display">
+                        <div class="viz-title">
+                            DNA Sequences
+                            <div class="stats-display" id="sequenceStats"></div>
+                        </div>
+                        <div class="sequence-container">
+                            <div id="sequenceScrollContainer" class="sequence-scroll-container">
+                                <div class="sequence-wrapper">
+                                    <div class="sequence-section" id="originalSequenceSection" style="display: none;">
+                                        <div class="sequence-label">Original Sequence</div>
+                                        <div id="originalSequenceText" class="sequence-text"></div>
+                                    </div>
+                                    <div class="sequence-section">
+                                        <div class="sequence-label">Generated Sequence</div>
+                                        <div id="sequenceText" class="sequence-text"></div>
+                                    </div>
+                                    <div id="positionAxis" class="position-axis"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-section score-matrix-section">
+                        <div class="viz-title">
+                            Score Matrix
+                            <div class="matrix-controls">
+                                <button class="toggle-btn active" data-mode="heatmap">Heatmap</button>
+                                <button class="toggle-btn" data-mode="logo">Logo</button>
+                            </div>
+                        </div>
+                        <div class="matrix-display">
+                            <div id="heatmapContainer" class="heatmap-container"></div>
+                            <div id="logoContainer" class="logo-container hidden"></div>
+                            <div id="heatmapLegend" class="heatmap-legend"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-section">
+                        <div class="viz-title">Oracle MSE vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="mseChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-section">
+                        <div class="viz-title">Noise Level vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="noiseChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-section">
+                        <div class="viz-title">Noise Rate vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="rateChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="placeholderContent" class="loading">
+                <h2>Welcome to D3-DNA Diffusion Visualizer</h2>
+                <p>Load your visualization data to begin exploring the diffusion process</p>
+                <br>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto; font-size: 12px; color: #888;">
+                    <p><strong>Supported formats:</strong></p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>JSON</strong> - Recommended for browser compatibility</li>
+                        <li><strong>HDF5</strong> (.h5, .hdf5) - Native browser support</li>
+                    </ul>
+                    <br>
+                </div>
+            </div>
+        </main>
+        
+        <div class="controls">
+            <div class="control-group">
+                <button class="control-btn" id="playBtn" title="Play/Pause">
+                    <span id="playIcon">▶</span>
+                </button>
+                <button class="control-btn" id="prevBtn" title="Previous Step">⏮</button>
+                <button class="control-btn" id="nextBtn" title="Next Step">⏭</button>
+            </div>
+            
+            <input type="range" id="stepSlider" class="step-slider" min="0" max="0" value="0">
+            
+            <div class="step-info">
+                <span id="stepInfo">Step: 0 / 0</span>
+            </div>
+            
+            <div class="control-group">
+                <label style="font-size: 12px; color: #888;">Speed:</label>
+                <input type="range" id="speedSlider" min="1" max="10" value="3" style="width: 80px;">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tooltip for heatmap hover -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        class DNADiffusionVisualizer {
+            constructor() {
+                this.data = null;
+                this.currentSample = 0;
+                this.currentStep = 0;
+                this.isPlaying = false;
+                this.playInterval = null;
+                this.charts = {};
+                this.matrixMode = 'heatmap';
+                this.theme = 'dark'; // Default theme
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.initializeCharts();
+                this.initializeTheme();
+                this.setupViewportSizing();
+            }
+            
+            initializeElements() {
+                this.elements = {
+                    fileInput: document.getElementById('fileInput'),
+                    sampleList: document.getElementById('sampleList'),
+                    datasetInfo: document.getElementById('datasetInfo'),
+                    mainContent: document.getElementById('mainContent'),
+                    placeholderContent: document.getElementById('placeholderContent'),
+                    sequenceText: document.getElementById('sequenceText'),
+                    originalSequenceText: document.getElementById('originalSequenceText'),
+                    originalSequenceSection: document.getElementById('originalSequenceSection'),
+                    sequenceScrollContainer: document.getElementById('sequenceScrollContainer'),
+                    sequenceStats: document.getElementById('sequenceStats'),
+                    positionAxis: document.getElementById('positionAxis'),
+                    heatmapContainer: document.getElementById('heatmapContainer'),
+                    logoContainer: document.getElementById('logoContainer'),
+                    heatmapLegend: document.getElementById('heatmapLegend'),
+                    stepSlider: document.getElementById('stepSlider'),
+                    stepInfo: document.getElementById('stepInfo'),
+                    playBtn: document.getElementById('playBtn'),
+                    playIcon: document.getElementById('playIcon'),
+                    prevBtn: document.getElementById('prevBtn'),
+                    nextBtn: document.getElementById('nextBtn'),
+                    speedSlider: document.getElementById('speedSlider'),
+                    themeToggle: document.getElementById('themeToggle'),
+                    themeIcon: document.getElementById('themeIcon')
+                };
+            }
+            
+            setupEventListeners() {
+                this.elements.fileInput.addEventListener('change', (e) => this.handleFileLoad(e));
+                this.elements.stepSlider.addEventListener('input', (e) => this.setStep(parseInt(e.target.value)));
+                this.elements.playBtn.addEventListener('click', () => this.togglePlay());
+                this.elements.prevBtn.addEventListener('click', () => this.previousStep());
+                this.elements.nextBtn.addEventListener('click', () => this.nextStep());
+                
+                document.querySelectorAll('.toggle-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.setMatrixMode(e.target.dataset.mode));
+                });
+                
+                // Theme toggle
+                this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+                
+                // Keyboard navigation
+                document.addEventListener('keydown', (e) => this.handleKeydown(e));
+                
+                // Window resize
+                window.addEventListener('resize', () => this.handleResize());
+            }
+            
+            handleKeydown(event) {
+                if (!this.data) return; // No data loaded
+                
+                // Don't handle keys when typing in input fields
+                if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+                
+                switch(event.key) {
+                    case 'ArrowUp':
+                        event.preventDefault();
+                        if (this.currentSample > 0) {
+                            this.selectSample(this.currentSample - 1);
+                        }
+                        break;
+                        
+                    case 'ArrowDown':
+                        event.preventDefault();
+                        if (this.currentSample < this.data.metadata.num_samples - 1) {
+                            this.selectSample(this.currentSample + 1);
+                        }
+                        break;
+                        
+                    case 'ArrowLeft':
+                        event.preventDefault();
+                        this.previousStep();
+                        break;
+                        
+                    case 'ArrowRight':
+                        event.preventDefault();
+                        this.nextStep();
+                        break;
+                        
+                    case ' ': // Spacebar
+                        event.preventDefault();
+                        this.togglePlay();
+                        break;
+                }
+            }
+            
+            setupViewportSizing() {
+                this.updateViewportSizes();
+            }
+            
+            handleResize() {
+                // Debounce resize events to prevent excessive recalculation
+                clearTimeout(this.resizeTimeout);
+                this.resizeTimeout = setTimeout(() => {
+                    this.updateViewportSizes();
+                    // Refresh charts to fit new size
+                    if (this.charts) {
+                        Object.values(this.charts).forEach(chart => {
+                            if (chart.resize) chart.resize();
+                        });
+                    }
+                }, 150);
+            }
+            
+            updateViewportSizes() {
+                const vh = window.innerHeight;
+                const vw = window.innerWidth;
+                
+                // Calculate dynamic heights based on viewport
+                const headerHeight = 60;
+                const controlsHeight = 80;
+                const sidebarInfoHeight = 150;
+                const padding = 40;
+                
+                const mainContentHeight = vh - headerHeight - controlsHeight - padding;
+                const sidebarContentHeight = vh - sidebarInfoHeight - padding;
+                
+                // Dynamic chart height based on available space
+                let chartHeight = 160;
+                if (vh < 800) chartHeight = 120;
+                else if (vh < 1000) chartHeight = 140;
+                else if (vh > 1200) chartHeight = 180;
+                
+                // Set CSS custom properties
+                document.documentElement.style.setProperty('--main-content-height', `${mainContentHeight}px`);
+                document.documentElement.style.setProperty('--sidebar-content-height', `${sidebarContentHeight}px`);
+                document.documentElement.style.setProperty('--chart-height', `${chartHeight}px`);
+                
+                // Trigger a reflow to ensure styles are applied
+                document.body.offsetHeight;
+            }
+            
+            initializeTheme() {
+                // Load saved theme from localStorage or use default
+                const savedTheme = localStorage.getItem('visualizer-theme') || 'dark';
+                this.setTheme(savedTheme);
+            }
+            
+            toggleTheme() {
+                const newTheme = this.theme === 'dark' ? 'light' : 'dark';
+                this.setTheme(newTheme);
+            }
+            
+            setTheme(theme) {
+                this.theme = theme;
+                document.documentElement.setAttribute('data-theme', theme);
+                
+                // Update theme icon
+                this.elements.themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+                
+                // Save to localStorage
+                localStorage.setItem('visualizer-theme', theme);
+                
+                // Update chart themes if they exist
+                this.updateChartThemes();
+            }
+            
+            updateChartThemes() {
+                if (!this.charts || Object.keys(this.charts).length === 0) return;
+                
+                const chartColors = {
+                    dark: {
+                        gridColor: '#333',
+                        textColor: '#888'
+                    },
+                    light: {
+                        gridColor: '#dee2e6',
+                        textColor: '#6c757d'
+                    }
+                };
+                
+                const colors = chartColors[this.theme];
+                
+                Object.values(this.charts).forEach(chart => {
+                    if (chart.options?.scales) {
+                        if (chart.options.scales.x?.grid) {
+                            chart.options.scales.x.grid.color = colors.gridColor;
+                        }
+                        if (chart.options.scales.x?.ticks) {
+                            chart.options.scales.x.ticks.color = colors.textColor;
+                        }
+                        if (chart.options.scales.y?.grid) {
+                            chart.options.scales.y.grid.color = colors.gridColor;
+                        }
+                        if (chart.options.scales.y?.ticks) {
+                            chart.options.scales.y.ticks.color = colors.textColor;
+                        }
+                        chart.update('none');
+                    }
+                });
+            }
+            
+            async handleFileLoad(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                this.elements.sampleList.innerHTML = '<div class="loading">Loading file...</div>';
+                
+                try {
+                    const fileExtension = file.name.toLowerCase().split('.').pop();
+                    
+                    if (fileExtension === 'h5' || fileExtension === 'hdf5') {
+                        this.data = await this.loadHDF5File(file);
+                    } else if (fileExtension === 'json') {
+                        this.data = await this.loadJSONFile(file);
+                    } else {
+                        throw new Error('Unsupported file format. Please use .h5, .hdf5, or .json files.');
+                    }
+                    
+                    this.initializeVisualization();
+                } catch (error) {
+                    console.error('Error loading file:', error);
+                    alert(`Error loading file: ${error.message}`);
+                    this.elements.sampleList.innerHTML = '<div class="loading">Load a data file to begin</div>';
+                }
+            }
+            
+
+            
+            async loadHDF5File(file) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    
+                    // Use h5wasm to parse HDF5 file
+                    const h5file = await h5wasm.HDF5File.open(arrayBuffer);
+                    
+                    // Extract metadata
+                    const metadata = {};
+                    if (h5file.has('metadata')) {
+                        const metadataGroup = h5file.get('metadata');
+                        
+                        // Get attributes
+                        const attrs = metadataGroup.attrs;
+                        for (const [key, value] of Object.entries(attrs)) {
+                            if (typeof value === 'number') {
+                                metadata[key] = value;
+                            } else if (Array.isArray(value)) {
+                                metadata[key] = Array.from(value);
+                            } else {
+                                metadata[key] = value;
+                            }
+                        }
+                        
+                        // Get original_samples if available
+                        if (metadataGroup.has('original_samples')) {
+                            const originalSamples = metadataGroup.get('original_samples');
+                            metadata.original_samples = Array.from(originalSamples.value);
+                        }
+                    }
+                    
+                    // Extract steps data
+                    const steps = [];
+                    if (h5file.has('steps')) {
+                        const stepsGroup = h5file.get('steps');
+                        
+                        // Get all step keys and sort them
+                        const stepKeys = Array.from(stepsGroup.keys()).filter(key => key.startsWith('step_'));
+                        stepKeys.sort((a, b) => {
+                            const aNum = parseInt(a.replace('step_', ''));
+                            const bNum = parseInt(b.replace('step_', ''));
+                            return aNum - bNum;
+                        });
+                        
+                        for (const stepKey of stepKeys) {
+                            const step = stepsGroup.get(stepKey);
+                            const stepData = {
+                                step: parseInt(step.attrs.step || stepKey.replace('step_', '')),
+                                timestep: parseFloat(step.attrs.timestep || 0),
+                                noise_level: parseFloat(step.attrs.noise_level || 0),
+                                noise_rate: parseFloat(step.attrs.noise_rate || 0),
+                                sequences: Array.from(step.get('sequence').value),
+                                score_matrices: Array.from(step.get('score_matrix').value),
+                                oracle_mses: step.has('oracle_mse') ? Array.from(step.get('oracle_mse').value) : []
+                            };
+                            steps.push(stepData);
+                        }
+                    }
+                    
+                    return {
+                        metadata: metadata,
+                        steps: steps
+                    };
+                    
+                } catch (error) {
+                    console.error('Error parsing HDF5 file:', error);
+                    throw new Error(`Failed to parse HDF5 file: ${error.message}`);
+                }
+            }
+            
+            // Alternative: Load from JSON format
+            async loadJSONFile(file) {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                // Validate the data structure matches expected format
+                if (!data.metadata || !data.steps) {
+                    throw new Error('Invalid data format. Expected structure with metadata and steps.');
+                }
+                
+                return data;
+            }
+            
+            initializeVisualization() {
+                this.elements.placeholderContent.classList.add('hidden');
+                this.elements.mainContent.classList.remove('hidden');
+                
+                // Show/hide original sequence section based on data availability
+                if (this.data.metadata.original_samples) {
+                    this.elements.originalSequenceSection.style.display = 'block';
+                    this.updateOriginalSequence();
+                } else {
+                    this.elements.originalSequenceSection.style.display = 'none';
+                }
+                
+                this.updateDatasetInfo();
+                this.createSampleList();
+                this.setupSlider();
+                this.selectSample(0);
+                this.updateCharts();
+            }
+            
+            updateDatasetInfo() {
+                const meta = this.data.metadata;
+                this.elements.datasetInfo.innerHTML = `
+                    Dataset: ${meta.dataset}<br>
+                    Samples: ${meta.num_samples}<br>
+                    Sequence Length: ${meta.sequence_length}<br>
+                    Steps: ${meta.total_steps}<br>
+                    Architecture: ${meta.architecture}
+                `;
+            }
+            
+            createSampleList() {
+                this.elements.sampleList.innerHTML = '';
+                for (let i = 0; i < this.data.metadata.num_samples; i++) {
+                    const item = document.createElement('div');
+                    item.className = 'sample-item';
+                    item.textContent = `Sample ${i + 1}`;
+                    item.addEventListener('click', () => this.selectSample(i));
+                    this.elements.sampleList.appendChild(item);
+                }
+            }
+            
+            setupSlider() {
+                this.elements.stepSlider.max = this.data.metadata.total_steps - 1;
+                this.elements.stepSlider.value = 0;
+                this.currentStep = 0;
+                this.updateStepInfo();
+            }
+            
+            selectSample(sampleIndex) {
+                this.currentSample = sampleIndex;
+                
+                // Update active sample in list
+                document.querySelectorAll('.sample-item').forEach((item, index) => {
+                    item.classList.toggle('active', index === sampleIndex);
+                });
+                
+                // Update original sequence if available
+                if (this.data.metadata.original_samples) {
+                    this.updateOriginalSequence();
+                }
+                
+                this.updateVisualization();
+                this.updateCharts();
+            }
+            
+            setStep(step) {
+                this.currentStep = Math.max(0, Math.min(step, this.data.metadata.total_steps - 1));
+                this.elements.stepSlider.value = this.currentStep;
+                this.updateStepInfo();
+                this.updateVisualization();
+                this.updateChartProgress();
+            }
+            
+            updateStepInfo() {
+                const stepData = this.data.steps[this.currentStep];
+                this.elements.stepInfo.textContent = `Step: ${this.currentStep} / ${this.data.metadata.total_steps - 1}`;
+                
+                // Add noise level info
+                if (stepData) {
+                    this.elements.stepInfo.textContent += ` | Noise: ${stepData.noise_level.toFixed(3)}`;
+                }
+            }
+            
+            updateVisualization() {
+                if (!this.data) return;
+                
+                const stepData = this.data.steps[this.currentStep];
+                const sampleData = {
+                    sequence: stepData.sequences[this.currentSample],
+                    scoreMatrix: stepData.score_matrices[this.currentSample],
+                    oracleMse: stepData.oracle_mses[this.currentSample]
+                };
+                
+                this.updateSequenceDisplay(sampleData.sequence);
+                this.updateScoreMatrix(sampleData.scoreMatrix);
+            }
+            
+            updateSequenceDisplay(sequence) {
+                const baseNames = ['A', 'C', 'G', 'T'];
+                const baseClasses = ['base-A', 'base-C', 'base-G', 'base-T'];
+                
+                let html = '';
+                sequence.forEach((base, index) => {
+                    html += `<span class="${baseClasses[base]}">${baseNames[base]}</span>`;
+                    // Add space every 10 bases for readability but keep single line
+                    if ((index + 1) % 10 === 0) html += ' ';
+                });
+                
+                this.elements.sequenceText.innerHTML = html;
+                
+                // Update position axis
+                this.updatePositionAxis(sequence.length);
+                
+                // Update stats
+                const baseCounts = [0, 0, 0, 0];
+                sequence.forEach(base => baseCounts[base]++);
+                const total = sequence.length;
+                
+                this.elements.sequenceStats.innerHTML = 
+                    `A:${(baseCounts[0]/total*100).toFixed(1)}% ` +
+                    `C:${(baseCounts[1]/total*100).toFixed(1)}% ` +
+                    `G:${(baseCounts[2]/total*100).toFixed(1)}% ` +
+                    `T:${(baseCounts[3]/total*100).toFixed(1)}%`;
+            }
+            
+            updateOriginalSequence() {
+                if (!this.data.metadata.original_samples) return;
+                
+                const originalSequence = this.data.metadata.original_samples[this.currentSample];
+                const baseNames = ['A', 'C', 'G', 'T'];
+                const baseClasses = ['base-A', 'base-C', 'base-G', 'base-T'];
+                
+                let html = '';
+                originalSequence.forEach((base, index) => {
+                    html += `<span class="${baseClasses[base]}">${baseNames[base]}</span>`;
+                    // Add space every 10 bases for readability but keep single line
+                    if ((index + 1) % 10 === 0) html += ' ';
+                });
+                
+                this.elements.originalSequenceText.innerHTML = html;
+                
+                // Update position axis
+                this.updatePositionAxis(originalSequence.length);
+            }
+            
+            updateScoreMatrix(scoreMatrix) {
+                if (this.matrixMode === 'heatmap') {
+                    this.updateHeatmap(scoreMatrix);
+                } else {
+                    this.updateLogo(scoreMatrix);
+                }
+            }
+            
+            updateHeatmap(scoreMatrix) {
+                const container = this.elements.heatmapContainer;
+                const legendContainer = this.elements.heatmapLegend;
+                container.innerHTML = '';
+                
+                const cellSize = 12;
+                const baseLabels = ['A', 'C', 'G', 'T'];
+                
+                const svg = d3.select(container)
+                    .append('svg')
+                    .attr('width', scoreMatrix.length * cellSize + 40)
+                    .attr('height', 4 * cellSize + 40);
+                
+                // Create color scale
+                const colorScale = d3.scaleSequential(d3.interpolateRdBu)
+                    .domain([1, 0]); // Reversed for blue=low, red=high
+                
+                // Get tooltip element
+                const tooltip = d3.select('#tooltip');
+                
+                // Add base labels
+                svg.selectAll('.base-label')
+                    .data(baseLabels)
+                    .enter()
+                    .append('text')
+                    .attr('class', 'base-label')
+                    .attr('x', 15)
+                    .attr('y', (d, i) => 25 + i * cellSize)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'central')
+                    .style('fill', this.theme === 'dark' ? '#888' : '#6c757d')
+                    .style('font-size', '10px')
+                    .text(d => d);
+                
+                // Add cells with hover tooltips
+                scoreMatrix.forEach((position, posIndex) => {
+                    position.forEach((score, baseIndex) => {
+                        svg.append('rect')
+                            .attr('x', 30 + posIndex * cellSize)
+                            .attr('y', 15 + baseIndex * cellSize)
+                            .attr('width', cellSize - 1)
+                            .attr('height', cellSize - 1)
+                            .style('fill', colorScale(score))
+                            .style('cursor', 'pointer')
+                            .on('mouseover', function(event) {
+                                tooltip
+                                    .style('opacity', 1)
+                                    .html(`Position: ${posIndex + 1}<br/>Base: ${baseLabels[baseIndex]}<br/>Score: ${score.toFixed(4)}`)
+                                    .style('left', (event.pageX + 10) + 'px')
+                                    .style('top', (event.pageY - 10) + 'px');
+                            })
+                            .on('mousemove', function(event) {
+                                tooltip
+                                    .style('left', (event.pageX + 10) + 'px')
+                                    .style('top', (event.pageY - 10) + 'px');
+                            })
+                            .on('mouseout', function() {
+                                tooltip.style('opacity', 0);
+                            });
+                    });
+                });
+                
+                // Create color legend
+                this.createHeatmapLegend(legendContainer, colorScale);
+            }
+            
+            updateLogo(scoreMatrix) {
+                const container = this.elements.logoContainer;
+                container.innerHTML = '';
+                
+                // Validate and process score matrix for information content (bits mode)
+                let processedMatrix = [];
+                try {
+                    // Check if scoreMatrix is valid
+                    if (!Array.isArray(scoreMatrix) || scoreMatrix.length === 0) {
+                        throw new Error('Invalid scoreMatrix format');
+                    }
+                    
+                    // Process ALL positions - no limits!
+                    
+                    // Convert to information content format - just normalize properly
+                    processedMatrix = scoreMatrix.map((position, idx) => {
+                        if (!Array.isArray(position) || position.length !== 4) {
+                            console.warn(`Invalid position at index ${idx}:`, position);
+                            return [0.5, 0.5, 0.5, 0.5]; // Default equal distribution
+                        }
+                        
+                        // Ensure all values are non-negative
+                        const cleanPosition = position.map(val => Math.max(0, val || 0));
+                        const total = cleanPosition.reduce((a, b) => a + b, 0);
+                        
+                        if (total === 0) {
+                            return [0.5, 0.5, 0.5, 0.5]; // Default equal distribution
+                        }
+                        
+                        // Simple normalization - just convert to probabilities
+                        // LogoJS will calculate information content properly
+                        const normalized = cleanPosition.map(val => val / total);
+                        
+                        // Return proper probabilities that sum to 1
+                        return normalized;
+                    });
+                } catch (error) {
+                    console.error('Error processing score matrix for logo:', error);
+                    container.innerHTML = this.createFallbackLogo(scoreMatrix);
+                    return;
+                }
+                
+                // Create a div for the logo
+                const logoDiv = document.createElement('div');
+                logoDiv.id = 'dna-logo-' + Date.now();
+                container.appendChild(logoDiv);
+                
+                // Get theme-appropriate colors for DNA bases
+                const themeColors = this.getThemeBasesColors();
+                
+                // Create custom DNA alphabet with theme colors
+                const customAlphabet = [
+                    {regex: 'A', color: themeColors.A, component: logojs.A},
+                    {regex: 'C', color: themeColors.C, component: logojs.C}, 
+                    {regex: 'G', color: themeColors.G, component: logojs.G},
+                    {regex: 'T', color: themeColors.T, component: logojs.T}
+                ];
+                
+                // Configure logojs with perfect size - no width limits!
+                const logoWidth = processedMatrix.length * 20 + 100; // Perfect width
+                const logoConfig = {
+                    ppm: processedMatrix,
+                    alphabet: customAlphabet,
+                    width: logoWidth,
+                    height: 200, // Perfect height
+                    mode: 'INFORMATION_CONTENT' // Explicitly set to information content mode
+                };
+                
+                // Use LogoJS to create the logo
+                if (typeof logojs === 'undefined') {
+                    this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                    return;
+                }
+                
+                try {
+                    // Use the React component directly from the bundle
+                    if (logojs.embedLogo) {
+                        logojs.embedLogo(logoDiv, logoConfig);
+                    } else if (logojs.embedDNALogo) {
+                        logojs.embedDNALogo(logoDiv, logoConfig);
+                    } else {
+                        // Fallback to custom SVG creation
+                        this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                    }
+                } catch (error) {
+                    console.error('Error creating logo:', error);
+                    this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                }
+            }
+            
+            getThemeBasesColors() {
+                // Get current theme colors from CSS variables
+                const style = getComputedStyle(document.documentElement);
+                return {
+                    A: style.getPropertyValue('--base-a-color').trim(),
+                    C: style.getPropertyValue('--base-c-color').trim(),
+                    G: style.getPropertyValue('--base-g-color').trim(),
+                    T: style.getPropertyValue('--base-t-color').trim()
+                };
+            }
+            
+            createCustomLogo(container, ppm, alphabet) {
+                // Custom SVG-based logo creation with perfect scaling
+                const width = ppm.length * 18 + 100; // Perfect width - 18px per letter
+                const height = 225; // Perfect height
+                const maxLetterHeight = 150; // Perfect letter size
+                const letterWidth = 15; // Perfect letter width
+                const baseline = height - 40; // Perfect space for labels
+                
+                const svg = d3.select(container)
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('viewBox', `0 0 ${width} ${height}`)
+                    .style('overflow-x', 'auto');
+                
+                // Add background
+                svg.append('rect')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('fill', 'transparent');
+                
+                // Calculate and draw letters for each position
+                ppm.forEach((position, posIndex) => {
+                    const xPos = 60 + posIndex * letterWidth;
+                    let yOffset = baseline;
+                    
+                    // Calculate information content properly
+                    let ic = Math.log2(4); // Maximum entropy for 4 bases (2 bits)
+                    position.forEach(p => {
+                        if (p > 0) ic += p * Math.log2(p); // Subtract entropy
+                    });
+                    
+                    // Don't skip any positions - show everything!
+                    
+                    // Sort bases by their probability values (ascending for stacking)
+                    const sortedBases = position
+                        .map((prob, idx) => ({
+                            prob, 
+                            ic: ic * prob, // Information content for this base
+                            idx, 
+                            letter: ['A', 'C', 'G', 'T'][idx],
+                            color: alphabet[idx].color
+                        }))
+                        .filter(base => base.prob > 0.0001) // Show almost everything
+                        .sort((a, b) => a.prob - b.prob);
+                    
+                    // Draw letters stacked by their information content
+                    sortedBases.forEach(({prob, ic, letter, color}) => {
+                        // Scale height based on information content - perfect scaling
+                        const letterHeightScaled = Math.max(5, (ic / 2.0) * maxLetterHeight); // Scale to 2 bits max
+                        const fontSize = Math.max(8, letterHeightScaled * 0.9); // Perfect minimum font
+                        
+                        svg.append('text')
+                            .attr('x', xPos)
+                            .attr('y', yOffset)
+                            .attr('font-family', 'Arial Black, Arial, sans-serif')
+                            .attr('font-weight', '900')
+                            .attr('font-size', `${fontSize}px`)
+                            .attr('fill', color)
+                            .attr('text-anchor', 'middle')
+                            .attr('dominant-baseline', 'alphabetic')
+                            .style('letter-spacing', '0px')
+                            .text(letter);
+                        
+                        yOffset -= letterHeightScaled;
+                    });
+                    
+                    // Add position numbers every 10 positions starting from 0, 10, 20, 30...
+                    if (posIndex % 10 === 0 || posIndex === ppm.length - 1) {
+                        svg.append('text')
+                            .attr('x', xPos)
+                            .attr('y', height - 10)
+                            .attr('font-size', '12px')
+                            .attr('font-weight', 'bold')
+                            .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
+                            .attr('text-anchor', 'middle')
+                            .text(posIndex); // Show 0-based indexing: 0, 10, 20, 30...
+                    }
+                });
+                
+                // Add y-axis scale (bits) - perfect size
+                const yScale = [0, 0.5, 1, 1.5, 2];
+                yScale.forEach(bit => {
+                    const yPos = baseline - (bit / 2.0) * maxLetterHeight;
+                    
+                    // Tick mark - perfect size
+                    svg.append('line')
+                        .attr('x1', 45)
+                        .attr('x2', 55)
+                        .attr('y1', yPos)
+                        .attr('y2', yPos)
+                        .attr('stroke', this.theme === 'dark' ? '#888' : '#6c757d')
+                        .attr('stroke-width', 2);
+                    
+                    // Label - perfect font
+                    svg.append('text')
+                        .attr('x', 40)
+                        .attr('y', yPos + 4)
+                        .attr('font-size', '12px')
+                        .attr('font-weight', 'bold')
+                        .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
+                        .attr('text-anchor', 'end')
+                        .text(bit.toFixed(1));
+                });
+                
+                // Y-axis label - perfect size
+                svg.append('text')
+                    .attr('x', 18)
+                    .attr('y', height / 2)
+                    .attr('font-size', '14px')
+                    .attr('font-weight', 'bold')
+                    .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
+                    .attr('text-anchor', 'middle')
+                    .attr('transform', `rotate(-90, 18, ${height / 2})`)
+                    .text('Information (bits)');
+                
+                // Add title - perfect size
+                svg.append('text')
+                    .attr('x', width / 2)
+                    .attr('y', 20)
+                    .attr('font-size', '14px')
+                    .attr('font-weight', 'bold')
+                    .attr('fill', this.theme === 'dark' ? '#00d4ff' : '#0056b3')
+                    .attr('text-anchor', 'middle')
+                    .text('Sequence Logo');
+            }
+            
+            createFallbackLogo(scoreMatrix) {
+                if (!Array.isArray(scoreMatrix) || scoreMatrix.length === 0) {
+                    return '<div style="color: #888; text-align: center; padding: 40px;">Invalid score matrix data</div>';
+                }
+                
+                const baseLetters = ['A', 'C', 'G', 'T'];
+                const themeColors = this.getThemeBasesColors();
+                const baseColors = [themeColors.A, themeColors.C, themeColors.G, themeColors.T];
+                
+                let html = '<div style="font-family: monospace; font-size: 14px; text-align: center; padding: 20px; color: #888;">';
+                html += '<div style="margin-bottom: 10px;">Sequence Logo (Fallback)</div>';
+                html += '<div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; max-width: 100%; overflow-x: auto;">';
+                
+                for (let i = 0; i < Math.min(scoreMatrix.length, 60); i++) {
+                    const position = scoreMatrix[i];
+                    
+                    if (!Array.isArray(position) || position.length !== 4) {
+                        html += '<span style="color: #666;">?</span>';
+                        continue;
+                    }
+                    
+                    // Normalize position to probabilities
+                    const cleanPosition = position.map(val => Math.max(0, val || 0));
+                    const total = cleanPosition.reduce((a, b) => a + b, 0);
+                    
+                    if (total > 0) {
+                        const normalized = cleanPosition.map(val => val / total);
+                        
+                        // Find the most probable base
+                        let maxIdx = 0;
+                        let maxVal = normalized[0];
+                        for (let j = 1; j < normalized.length; j++) {
+                            if (normalized[j] > maxVal) {
+                                maxVal = normalized[j];
+                                maxIdx = j;
+                            }
+                        }
+                        
+                        const confidence = maxVal;
+                        const opacity = Math.max(0.3, confidence); // Scale opacity by confidence
+                        const fontSize = Math.max(10, 14 * confidence); // Scale size by confidence
+                        
+                        html += `<span style="color: ${baseColors[maxIdx]}; opacity: ${opacity}; font-weight: bold; font-size: ${fontSize}px;">${baseLetters[maxIdx]}</span>`;
+                    } else {
+                        html += '<span style="color: #666;">N</span>';
+                    }
+                }
+                
+                html += '</div>';
+                html += '<div style="font-size: 10px; margin-top: 10px; color: #666;">LogoJS unavailable - showing consensus sequence</div>';
+                html += '</div>';
+                
+                return html;
+            }
+            
+            setMatrixMode(mode) {
+                this.matrixMode = mode;
+                
+                // Update button states
+                document.querySelectorAll('.toggle-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.mode === mode);
+                });
+                
+                // Toggle containers
+                this.elements.heatmapContainer.classList.toggle('hidden', mode !== 'heatmap');
+                this.elements.logoContainer.classList.toggle('hidden', mode !== 'logo');
+                this.elements.heatmapLegend.classList.toggle('hidden', mode !== 'heatmap');
+                
+                // Update visualization
+                if (this.data) {
+                    const stepData = this.data.steps[this.currentStep];
+                    const scoreMatrix = stepData.score_matrices[this.currentSample];
+                    this.updateScoreMatrix(scoreMatrix);
+                }
+            }
+            
+            initializeCharts() {
+                const getChartOptions = () => ({
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            grid: { color: this.theme === 'dark' ? '#333' : '#dee2e6' },
+                            ticks: { color: this.theme === 'dark' ? '#888' : '#6c757d' }
+                        },
+                        y: { 
+                            grid: { color: this.theme === 'dark' ? '#333' : '#dee2e6' },
+                            ticks: { color: this.theme === 'dark' ? '#888' : '#6c757d' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    onClick: (event, elements, chart) => {
+                        if (elements.length > 0) {
+                            // Get the x-axis value (step) from the clicked point
+                            const dataIndex = elements[0].index;
+                            if (dataIndex !== undefined && dataIndex >= 0) {
+                                this.setStep(dataIndex);
+                            }
+                        } else {
+                            // If no elements are clicked, try to get the step from the x-axis position
+                            const canvasPosition = Chart.helpers.getRelativePosition(event, chart);
+                            const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
+                            if (dataX !== undefined && dataX >= 0) {
+                                const step = Math.round(dataX);
+                                if (step >= 0 && step < this.data.metadata.total_steps) {
+                                    this.setStep(step);
+                                }
+                            }
+                        }
+                    },
+                    onHover: (event, elements, chart) => {
+                        chart.canvas.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
+                });
+                
+                // MSE Chart
+                this.charts.mse = new Chart(document.getElementById('mseChart'), {
+                    type: 'line',
+                    data: { datasets: [] },
+                    options: getChartOptions()
+                });
+                
+                // Noise Level Chart
+                this.charts.noise = new Chart(document.getElementById('noiseChart'), {
+                    type: 'line',
+                    data: { datasets: [] },
+                    options: getChartOptions()
+                });
+                
+                // Noise Rate Chart
+                this.charts.rate = new Chart(document.getElementById('rateChart'), {
+                    type: 'line',
+                    data: { datasets: [] },
+                    options: getChartOptions()
+                });
+            }
+            
+            updateCharts() {
+                if (!this.data) return;
+                
+                const steps = this.data.steps.map(step => step.step);
+                const mseData = this.data.steps.map(step => step.oracle_mses[this.currentSample]);
+                const noiseData = this.data.steps.map(step => step.noise_level);
+                const rateData = this.data.steps.map(step => step.noise_rate);
+                
+                // Update MSE chart
+                this.charts.mse.data = {
+                    labels: steps,
+                    datasets: [{
+                        data: mseData,
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                };
+                
+                // Update Noise Level chart
+                this.charts.noise.data = {
+                    labels: steps,
+                    datasets: [{
+                        data: noiseData,
+                        borderColor: '#ff6b6b',
+                        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                };
+                
+                // Update Noise Rate chart
+                this.charts.rate.data = {
+                    labels: steps,
+                    datasets: [{
+                        data: rateData,
+                        borderColor: '#96ceb4',
+                        backgroundColor: 'rgba(150, 206, 180, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                };
+                
+                // Update all charts
+                Object.values(this.charts).forEach(chart => chart.update('none'));
+                
+                this.updateChartProgress();
+            }
+            
+            updateChartProgress() {
+                // Add current step indicator to charts
+                Object.values(this.charts).forEach(chart => {
+                    // Remove existing progress line
+                    if (chart.data.datasets[1]) {
+                        chart.data.datasets.pop();
+                    }
+                    
+                    // Theme-aware progress indicator colors
+                    const progressColors = this.theme === 'dark' 
+                        ? { border: '#ffffff', background: '#ffffff' }
+                        : { border: '#212529', background: '#ffffff' };
+                    
+                    // Add progress line
+                    chart.data.datasets.push({
+                        type: 'scatter',
+                        data: [{
+                            x: this.currentStep,
+                            y: chart.data.datasets[0].data[this.currentStep]
+                        }],
+                        borderColor: progressColors.border,
+                        backgroundColor: progressColors.background,
+                        borderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        showLine: false,
+                        order: -1 // Render this dataset on top of others
+                    });
+                    
+                    chart.update('none');
+                });
+            }
+            
+            createHeatmapLegend(container, colorScale) {
+                container.innerHTML = '';
+                
+                // Create legend HTML
+                container.innerHTML = `
+                    <div class="legend-labels">
+                        <span>Low</span>
+                        <span>Score</span>
+                        <span>High</span>
+                    </div>
+                    <div class="legend-gradient"></div>
+                `;
+                
+                // Create SVG gradient for the legend
+                const gradientSvg = d3.select(container)
+                    .select('.legend-gradient')
+                    .append('svg')
+                    .attr('width', '100%')
+                    .attr('height', '100%');
+                
+                // Define gradient
+                const gradient = gradientSvg.append('defs')
+                    .append('linearGradient')
+                    .attr('id', 'heatmap-gradient')
+                    .attr('x1', '0%')
+                    .attr('x2', '100%');
+                
+                // Add color stops
+                const stops = 20;
+                for (let i = 0; i <= stops; i++) {
+                    const t = i / stops;
+                    gradient.append('stop')
+                        .attr('offset', `${t * 100}%`)
+                        .attr('stop-color', colorScale(1 - t)); // Reversed to match scale
+                }
+                
+                // Apply gradient
+                gradientSvg.append('rect')
+                    .attr('width', '100%')
+                    .attr('height', '100%')
+                    .style('fill', 'url(#heatmap-gradient)');
+            }
+            
+            togglePlay() {
+                this.isPlaying = !this.isPlaying;
+                
+                if (this.isPlaying) {
+                    this.elements.playIcon.textContent = '⏸';
+                    this.play();
+                } else {
+                    this.elements.playIcon.textContent = '▶';
+                    this.pause();
+                }
+            }
+            
+            play() {
+                if (!this.data) return;
+                
+                const speed = parseInt(this.elements.speedSlider.value);
+                const interval = Math.max(100, 1000 / speed);
+                
+                this.playInterval = setInterval(() => {
+                    if (this.currentStep < this.data.metadata.total_steps - 1) {
+                        this.setStep(this.currentStep + 1);
+                    } else {
+                        this.togglePlay(); // Auto-pause at end
+                    }
+                }, interval);
+            }
+            
+            pause() {
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+            }
+            
+            previousStep() {
+                this.setStep(this.currentStep - 1);
+            }
+            
+            nextStep() {
+                this.setStep(this.currentStep + 1);
+            }
+            
+            updatePositionAxis(sequenceLength) {
+                if (!this.elements.positionAxis) return;
+                
+                let html = '';
+                
+                // Create the position axis with the same spacing pattern as the sequence
+                for (let i = 0; i < sequenceLength; i++) {
+                    // Show position numbers every 10 bases (0, 10, 20, 30, etc.)
+                    if (i % 10 === 0) {
+                        // Add the position number as a string
+                        const positionStr = i.toString();
+                        html += `<span style="display: inline-block; width: 1ch; text-align: center;">${positionStr.charAt(0)}</span>`;
+                        
+                        // Add remaining digits of multi-digit numbers
+                        for (let j = 1; j < positionStr.length; j++) {
+                            if (i + j < sequenceLength) {
+                                html += `<span style="display: inline-block; width: 1ch; text-align: center;">${positionStr.charAt(j)}</span>`;
+                                i++; // Skip ahead for multi-digit numbers
+                            }
+                        }
+                    } else {
+                        // Add empty space to maintain alignment
+                        html += `<span style="display: inline-block; width: 1.285ch;">&nbsp;</span>`;
+                    }
+                    
+                    // Add the same spacing as the sequence (space every 10 bases)
+                    if ((i + 1) % 10 === 0 && i + 1 < sequenceLength) {
+                        html += ' ';
+                    }
+                }
+                
+                this.elements.positionAxis.innerHTML = html;
+            }
+        }
+        
+        // Initialize the visualizer when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new DNADiffusionVisualizer();
+        });
+    </script>
+</body>
+</html>

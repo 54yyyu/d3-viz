@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWM Matrix & Sequence Logo Examples</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .example-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            transition: transform 0.2s;
+        }
+        
+        .example-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .example-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .matrix-display {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .matrix-table th, .matrix-table td {
+            padding: 4px 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .matrix-table th {
+            background: #e9ecef;
+            font-weight: 600;
+        }
+        
+        .logo-container {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+        
+        .generate-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .description {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            color: #1565c0;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .control-btn:hover, .control-btn.active {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 PWM Matrix & Sequence Logo Examples</h1>
+            <p class="subtitle">See how Position Weight Matrices translate into beautiful sequence logos</p>
+        </div>
+        
+        <div class="info-box">
+            <strong>About PWM Matrices:</strong> Position Weight Matrices (PWMs) represent the probability of finding each nucleotide/amino acid at each position in a sequence motif. Each row represents a position, and each column represents a nucleotide (A,C,G,T for DNA) or amino acid (for proteins). The values show the frequency or probability of each base at that position.
+        </div>
+        
+        <div class="controls">
+            <span><strong>View Examples:</strong></span>
+            <button class="control-btn active" onclick="showExamples('all')">All Examples</button>
+            <button class="control-btn" onclick="showExamples('dna')">DNA Only</button>
+            <button class="control-btn" onclick="showExamples('rna')">RNA Only</button>
+            <button class="control-btn" onclick="showExamples('protein')">Protein Only</button>
+            <button class="control-btn" onclick="generateAllLogos()">Generate All Logos</button>
+        </div>
+        
+        <div class="examples-grid" id="examplesGrid">
+            <!-- Examples will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script src="bundle.js"></script>
+    <script>
+        // LogoJS is now loaded from bundle.js
+        function getLogoJS() {
+            return window.logojs;
+        }
+
+        // PWM Matrix examples
+        const examples = [
+            {
+                id: 'tata_box',
+                type: 'dna',
+                title: '🧬 TATA Box (DNA)',
+                description: 'A classic TATA box motif found in eukaryotic promoters. Shows strong conservation of T-A-T-A sequence.',
+                pwm: [
+                    [0.1, 0.2, 0.1, 0.6],  // Position 1: T preferred
+                    [0.8, 0.1, 0.05, 0.05], // Position 2: A strongly preferred  
+                    [0.05, 0.05, 0.1, 0.8], // Position 3: T strongly preferred
+                    [0.7, 0.1, 0.1, 0.1],   // Position 4: A preferred
+                    [0.2, 0.2, 0.2, 0.4],   // Position 5: T slightly preferred
+                    [0.6, 0.15, 0.15, 0.1], // Position 6: A preferred
+                    [0.3, 0.3, 0.2, 0.2]    // Position 7: A=C preferred
+                ]
+            },
+            {
+                id: 'cpg_island',
+                type: 'dna', 
+                title: '🧬 CpG Island (DNA)',
+                description: 'CpG dinucleotide motif often found in gene promoters, showing C-G preference.',
+                pwm: [
+                    [0.1, 0.7, 0.1, 0.1],   // Position 1: C strongly preferred
+                    [0.1, 0.1, 0.7, 0.1],   // Position 2: G strongly preferred
+                    [0.2, 0.6, 0.1, 0.1],   // Position 3: C preferred
+                    [0.15, 0.15, 0.6, 0.1], // Position 4: G preferred
+                    [0.25, 0.5, 0.15, 0.1]  // Position 5: C preferred
+                ]
+            },
+            {
+                id: 'kozak_sequence',
+                type: 'rna',
+                title: '🧬 Kozak Sequence (RNA)', 
+                description: 'Translation initiation site in eukaryotes. Shows the conserved sequence around the start codon AUG.',
+                pwm: [
+                    [0.5, 0.2, 0.2, 0.1],   // Position 1: A preferred
+                    [0.2, 0.6, 0.1, 0.1],   // Position 2: C preferred  
+                    [0.3, 0.4, 0.2, 0.1],   // Position 3: C preferred
+                    [0.9, 0.03, 0.03, 0.04], // Position 4: A (start codon)
+                    [0.05, 0.05, 0.05, 0.85], // Position 5: U (start codon)
+                    [0.1, 0.1, 0.7, 0.1],   // Position 6: G (start codon)
+                    [0.2, 0.2, 0.5, 0.1]    // Position 7: G preferred
+                ]
+            },
+            {
+                id: 'splice_donor',
+                type: 'rna',
+                title: '🧬 Splice Donor Site (RNA)',
+                description: 'Exon-intron boundary showing the conserved GU dinucleotide at the splice site.',
+                pwm: [
+                    [0.2, 0.3, 0.4, 0.1],   // Position 1: G preferred
+                    [0.3, 0.4, 0.2, 0.1],   // Position 2: C preferred
+                    [0.1, 0.1, 0.8, 0.0],   // Position 3: G (splice site)
+                    [0.0, 0.0, 0.1, 0.9],   // Position 4: U (splice site)  
+                    [0.5, 0.2, 0.2, 0.1],   // Position 5: A preferred
+                    [0.2, 0.2, 0.4, 0.2]    // Position 6: G preferred
+                ]
+            },
+            {
+                id: 'zinc_finger',
+                type: 'protein',
+                title: '🧬 Zinc Finger Motif (Protein)',
+                description: 'DNA-binding domain with conserved cysteine and histidine residues that coordinate zinc.',
+                pwm: [
+                    [0.05, 0.05, 0.8, 0.05, 0.05], // Position 1: C (cysteine)
+                    [0.2, 0.2, 0.2, 0.2, 0.2],     // Position 2: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],     // Position 3: variable  
+                    [0.05, 0.05, 0.8, 0.05, 0.05], // Position 4: C (cysteine)
+                    [0.2, 0.2, 0.2, 0.2, 0.2],     // Position 5: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],     // Position 6: variable
+                    [0.05, 0.75, 0.05, 0.05, 0.1], // Position 7: H (histidine)
+                    [0.2, 0.2, 0.2, 0.2, 0.2],     // Position 8: variable
+                    [0.05, 0.75, 0.05, 0.05, 0.1]  // Position 9: H (histidine)
+                ]
+            },
+            {
+                id: 'leucine_zipper',
+                type: 'protein',
+                title: '🧬 Leucine Zipper (Protein)', 
+                description: 'Protein dimerization motif with leucine residues at every 7th position forming a coiled-coil structure.',
+                pwm: [
+                    [0.6, 0.1, 0.1, 0.1, 0.1],   // Position 1: L (leucine)
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 2: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 3: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 4: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 5: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 6: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 7: variable
+                    [0.7, 0.08, 0.08, 0.08, 0.06], // Position 8: L (leucine, 7th position)
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 9: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 10: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 11: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 12: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2],   // Position 13: variable
+                    [0.2, 0.2, 0.2, 0.2, 0.2]    // Position 14: variable
+                ]
+            }
+        ];
+
+        // Get alphabet headers for different sequence types
+        function getAlphabetHeaders(type) {
+            switch(type) {
+                case 'dna': return ['A', 'C', 'G', 'T'];
+                case 'rna': return ['A', 'C', 'G', 'U'];  
+                case 'protein': return ['A', 'C', 'D', 'E', 'F']; // simplified for display
+                default: return ['A', 'C', 'G', 'T'];
+            }
+        }
+
+        // Create matrix table HTML
+        function createMatrixTable(pwm, type) {
+            const headers = getAlphabetHeaders(type);
+            let html = '<table class="matrix-table"><thead><tr><th>Position</th>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead><tbody>';
+            
+            pwm.forEach((row, i) => {
+                html += `<tr><td><strong>${i + 1}</strong></td>`;
+                row.forEach(val => {
+                    html += `<td>${val.toFixed(2)}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // Generate logo for an example
+        function generateLogo(exampleId) {
+            const logojs = getLogoJS();
+            if (!logojs) {
+                alert('Could not load logojs library');
+                return;
+            }
+
+            const example = examples.find(e => e.id === exampleId);
+            if (!example) return;
+
+            const container = document.getElementById(`logo_${exampleId}`);
+            
+            try {
+                // Use the appropriate logo type
+                let logoComponent;
+                switch(example.type) {
+                    case 'dna':
+                        logojs.embedDNALogo(container, { 
+                            ppm: example.pwm,
+                            height: 120,
+                            width: 400
+                        });
+                        break;
+                    case 'rna':
+                        logojs.embedRNALogo(container, {
+                            ppm: example.pwm, 
+                            height: 120,
+                            width: 400
+                        });
+                        break;
+                    case 'protein':
+                        logojs.embedProteinLogo(container, {
+                            ppm: example.pwm,
+                            height: 120, 
+                            width: 400
+                        });
+                        break;
+                }
+            } catch (error) {
+                console.error('Error generating logo:', error);
+                container.innerHTML = '<div style="color: #dc3545; padding: 20px;">Error generating logo</div>';
+            }
+        }
+
+        // Create example card HTML
+        function createExampleCard(example) {
+            const matrixTable = createMatrixTable(example.pwm, example.type);
+            
+            return `
+                <div class="example-card" data-type="${example.type}">
+                    <div class="example-title">${example.title}</div>
+                    <div class="description">${example.description}</div>
+                    
+                    <div class="matrix-display">
+                        <strong>Position Weight Matrix:</strong>
+                        ${matrixTable}
+                    </div>
+                    
+                    <div class="logo-container" id="logo_${example.id}">
+                        <button class="generate-btn" onclick="generateLogo('${example.id}')">
+                            Generate Sequence Logo
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show examples based on filter
+        function showExamples(filter) {
+            const grid = document.getElementById('examplesGrid');
+            const filteredExamples = filter === 'all' ? examples : examples.filter(e => e.type === filter);
+            
+            grid.innerHTML = filteredExamples.map(createExampleCard).join('');
+            
+            // Update active button
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // Generate all visible logos
+        function generateAllLogos() {
+            const visibleCards = document.querySelectorAll('.example-card');
+            visibleCards.forEach((card, index) => {
+                const exampleId = card.querySelector('.logo-container').id.replace('logo_', '');
+                // Add small delay to prevent overwhelming the browser
+                setTimeout(() => generateLogo(exampleId), index * 200);
+            });
+        }
+
+        // Initialize the page
+        function init() {
+            showExamples('all');
+        }
+
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
