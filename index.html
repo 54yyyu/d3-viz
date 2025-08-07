@@ -550,6 +550,23 @@
             font-size: 14px;
         }
         
+        /* Override LogoJS colors for theme support */
+        [data-theme="dark"] .logo-container svg text {
+            fill: #ffffff !important;
+        }
+        
+        [data-theme="dark"] .logo-container svg line {
+            stroke: #ffffff !important;
+        }
+        
+        [data-theme="light"] .logo-container svg text {
+            fill: #6c757d !important;
+        }
+        
+        [data-theme="light"] .logo-container svg line {
+            stroke: #6c757d !important;
+        }
+        
         
         @keyframes fadeInUp {
             from {
@@ -966,9 +983,32 @@
             }
             
             initializeTheme() {
-                // Load saved theme from localStorage or use default
-                const savedTheme = localStorage.getItem('visualizer-theme') || 'dark';
-                this.setTheme(savedTheme);
+                // Check for saved theme first, then system preference, then default to dark
+                const savedTheme = localStorage.getItem('visualizer-theme');
+                let theme = savedTheme;
+                
+                if (!savedTheme) {
+                    // Check system preference
+                    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                        theme = 'light';
+                    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        theme = 'dark';
+                    } else {
+                        theme = 'dark'; // Default fallback
+                    }
+                }
+                
+                this.setTheme(theme);
+                
+                // Listen for system theme changes
+                if (window.matchMedia) {
+                    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+                        // Only auto-switch if user hasn't manually set a preference
+                        if (!localStorage.getItem('visualizer-theme')) {
+                            this.setTheme(e.matches ? 'light' : 'dark');
+                        }
+                    });
+                }
             }
             
             toggleTheme() {
@@ -1419,12 +1459,18 @@
                     alphabet: customAlphabet,
                     width: logoWidth,
                     height: 200, // Perfect height
-                    mode: 'INFORMATION_CONTENT' // Explicitly set to information content mode
+                    mode: 'INFORMATION_CONTENT', // Explicitly set to information content mode
+                    // Add theme-aware styling
+                    style: {
+                        textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
+                        axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
+                        gridColor: this.theme === 'dark' ? '#333' : '#dee2e6'
+                    }
                 };
                 
                 // Use LogoJS to create the logo
                 if (typeof logojs === 'undefined') {
-                    this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                    container.innerHTML = this.createFallbackLogo(scoreMatrix);
                     return;
                 }
                 
@@ -1435,12 +1481,12 @@
                     } else if (logojs.embedDNALogo) {
                         logojs.embedDNALogo(logoDiv, logoConfig);
                     } else {
-                        // Fallback to custom SVG creation
-                        this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                        // Fallback to simple text display
+                        container.innerHTML = this.createFallbackLogo(scoreMatrix);
                     }
                 } catch (error) {
                     console.error('Error creating logo:', error);
-                    this.createCustomLogo(logoDiv, processedMatrix, customAlphabet);
+                    container.innerHTML = this.createFallbackLogo(scoreMatrix);
                 }
             }
             
@@ -1455,131 +1501,59 @@
                 };
             }
             
-            createCustomLogo(container, ppm, alphabet) {
-                // Custom SVG-based logo creation with perfect scaling
-                const width = ppm.length * 18 + 100; // Perfect width - 18px per letter
-                const height = 225; // Perfect height
-                const maxLetterHeight = 150; // Perfect letter size
-                const letterWidth = 15; // Perfect letter width
-                const baseline = height - 40; // Perfect space for labels
+            createFallbackLogo(scoreMatrix) {
+                if (!Array.isArray(scoreMatrix) || scoreMatrix.length === 0) {
+                    return '<div style="color: #888; text-align: center; padding: 40px;">Invalid score matrix data</div>';
+                }
                 
-                const svg = d3.select(container)
-                    .append('svg')
-                    .attr('width', width)
-                    .attr('height', height)
-                    .attr('viewBox', `0 0 ${width} ${height}`)
-                    .style('overflow-x', 'auto');
+                const baseLetters = ['A', 'C', 'G', 'T'];
+                const themeColors = this.getThemeBasesColors();
+                const baseColors = [themeColors.A, themeColors.C, themeColors.G, themeColors.T];
                 
-                // Add background
-                svg.append('rect')
-                    .attr('width', width)
-                    .attr('height', height)
-                    .attr('fill', 'transparent');
+                let html = '<div style="font-family: monospace; font-size: 14px; text-align: center; padding: 20px; color: #888;">';
+                html += '<div style="margin-bottom: 10px;">Sequence Logo (Fallback)</div>';
+                html += '<div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; max-width: 100%; overflow-x: auto;">';
                 
-                // Calculate and draw letters for each position
-                ppm.forEach((position, posIndex) => {
-                    const xPos = 60 + posIndex * letterWidth;
-                    let yOffset = baseline;
+                for (let i = 0; i < Math.min(scoreMatrix.length, 60); i++) {
+                    const position = scoreMatrix[i];
                     
-                    // Calculate information content properly
-                    let ic = Math.log2(4); // Maximum entropy for 4 bases (2 bits)
-                    position.forEach(p => {
-                        if (p > 0) ic += p * Math.log2(p); // Subtract entropy
-                    });
-                    
-                    // Don't skip any positions - show everything!
-                    
-                    // Sort bases by their probability values (ascending for stacking)
-                    const sortedBases = position
-                        .map((prob, idx) => ({
-                            prob, 
-                            ic: ic * prob, // Information content for this base
-                            idx, 
-                            letter: ['A', 'C', 'G', 'T'][idx],
-                            color: alphabet[idx].color
-                        }))
-                        .filter(base => base.prob > 0.0001) // Show almost everything
-                        .sort((a, b) => a.prob - b.prob);
-                    
-                    // Draw letters stacked by their information content
-                    sortedBases.forEach(({prob, ic, letter, color}) => {
-                        // Scale height based on information content - perfect scaling
-                        const letterHeightScaled = Math.max(5, (ic / 2.0) * maxLetterHeight); // Scale to 2 bits max
-                        const fontSize = Math.max(8, letterHeightScaled * 0.9); // Perfect minimum font
-                        
-                        svg.append('text')
-                            .attr('x', xPos)
-                            .attr('y', yOffset)
-                            .attr('font-family', 'Arial Black, Arial, sans-serif')
-                            .attr('font-weight', '900')
-                            .attr('font-size', `${fontSize}px`)
-                            .attr('fill', color)
-                            .attr('text-anchor', 'middle')
-                            .attr('dominant-baseline', 'alphabetic')
-                            .style('letter-spacing', '0px')
-                            .text(letter);
-                        
-                        yOffset -= letterHeightScaled;
-                    });
-                    
-                    // Add position numbers every 10 positions starting from 0, 10, 20, 30...
-                    if (posIndex % 10 === 0 || posIndex === ppm.length - 1) {
-                        svg.append('text')
-                            .attr('x', xPos)
-                            .attr('y', height - 10)
-                            .attr('font-size', '12px')
-                            .attr('font-weight', 'bold')
-                            .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
-                            .attr('text-anchor', 'middle')
-                            .text(posIndex); // Show 0-based indexing: 0, 10, 20, 30...
+                    if (!Array.isArray(position) || position.length !== 4) {
+                        html += '<span style="color: #666;">?</span>';
+                        continue;
                     }
-                });
-                
-                // Add y-axis scale (bits) - perfect size
-                const yScale = [0, 0.5, 1, 1.5, 2];
-                yScale.forEach(bit => {
-                    const yPos = baseline - (bit / 2.0) * maxLetterHeight;
                     
-                    // Tick mark - perfect size
-                    svg.append('line')
-                        .attr('x1', 45)
-                        .attr('x2', 55)
-                        .attr('y1', yPos)
-                        .attr('y2', yPos)
-                        .attr('stroke', this.theme === 'dark' ? '#888' : '#6c757d')
-                        .attr('stroke-width', 2);
+                    // Normalize position to probabilities
+                    const cleanPosition = position.map(val => Math.max(0, val || 0));
+                    const total = cleanPosition.reduce((a, b) => a + b, 0);
                     
-                    // Label - perfect font
-                    svg.append('text')
-                        .attr('x', 40)
-                        .attr('y', yPos + 4)
-                        .attr('font-size', '12px')
-                        .attr('font-weight', 'bold')
-                        .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
-                        .attr('text-anchor', 'end')
-                        .text(bit.toFixed(1));
-                });
+                    if (total > 0) {
+                        const normalized = cleanPosition.map(val => val / total);
+                        
+                        // Find the most probable base
+                        let maxIdx = 0;
+                        let maxVal = normalized[0];
+                        for (let j = 1; j < normalized.length; j++) {
+                            if (normalized[j] > maxVal) {
+                                maxVal = normalized[j];
+                                maxIdx = j;
+                            }
+                        }
+                        
+                        const confidence = maxVal;
+                        const opacity = Math.max(0.3, confidence); // Scale opacity by confidence
+                        const fontSize = Math.max(10, 14 * confidence); // Scale size by confidence
+                        
+                        html += `<span style="color: ${baseColors[maxIdx]}; opacity: ${opacity}; font-weight: bold; font-size: ${fontSize}px;">${baseLetters[maxIdx]}</span>`;
+                    } else {
+                        html += '<span style="color: #666;">N</span>';
+                    }
+                }
                 
-                // Y-axis label - perfect size
-                svg.append('text')
-                    .attr('x', 18)
-                    .attr('y', height / 2)
-                    .attr('font-size', '14px')
-                    .attr('font-weight', 'bold')
-                    .attr('fill', this.theme === 'dark' ? '#888' : '#6c757d')
-                    .attr('text-anchor', 'middle')
-                    .attr('transform', `rotate(-90, 18, ${height / 2})`)
-                    .text('Information (bits)');
+                html += '</div>';
+                html += '<div style="font-size: 10px; margin-top: 10px; color: #666;">LogoJS unavailable - showing consensus sequence</div>';
+                html += '</div>';
                 
-                // Add title - perfect size
-                svg.append('text')
-                    .attr('x', width / 2)
-                    .attr('y', 20)
-                    .attr('font-size', '14px')
-                    .attr('font-weight', 'bold')
-                    .attr('fill', this.theme === 'dark' ? '#00d4ff' : '#0056b3')
-                    .attr('text-anchor', 'middle')
-                    .text('Sequence Logo');
+                return html;
             }
             
             createFallbackLogo(scoreMatrix) {
