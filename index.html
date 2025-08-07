@@ -271,6 +271,16 @@
         .base-G { color: var(--base-g-color); }
         .base-T { color: var(--base-t-color); }
         
+        .nucleotide-highlight {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-radius: 3px;
+            padding: 0 2px;
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
         .matrix-controls {
             margin-bottom: 10px;
         }
@@ -849,6 +859,7 @@
                 this.charts = {};
                 this.matrixMode = 'heatmap';
                 this.theme = 'dark'; // Default theme
+                this.highlightedPosition = null; // Track highlighted nucleotide position
                 
                 this.initializeElements();
                 this.setupEventListeners();
@@ -1234,6 +1245,9 @@
             selectSample(sampleIndex) {
                 this.currentSample = sampleIndex;
                 
+                // Clear highlight when switching samples (different sequence)
+                this.highlightedPosition = null;
+                
                 // Update active sample in list
                 document.querySelectorAll('.sample-item').forEach((item, index) => {
                     item.classList.toggle('active', index === sampleIndex);
@@ -1286,7 +1300,9 @@
                 
                 let html = '';
                 sequence.forEach((base, index) => {
-                    html += `<span class="${baseClasses[base]}">${baseNames[base]}</span>`;
+                    const isHighlighted = this.highlightedPosition === index;
+                    const highlightClass = isHighlighted ? ' nucleotide-highlight' : '';
+                    html += `<span class="${baseClasses[base]}${highlightClass}" data-position="${index}">${baseNames[base]}</span>`;
                     // Add space every 10 bases for readability but keep single line
                     if ((index + 1) % 10 === 0) html += ' ';
                 });
@@ -1317,7 +1333,9 @@
                 
                 let html = '';
                 originalSequence.forEach((base, index) => {
-                    html += `<span class="${baseClasses[base]}">${baseNames[base]}</span>`;
+                    const isHighlighted = this.highlightedPosition === index;
+                    const highlightClass = isHighlighted ? ' nucleotide-highlight' : '';
+                    html += `<span class="${baseClasses[base]}${highlightClass}" data-position="${index}">${baseNames[base]}</span>`;
                     // Add space every 10 bases for readability but keep single line
                     if ((index + 1) % 10 === 0) html += ' ';
                 });
@@ -1326,6 +1344,58 @@
                 
                 // Update position axis
                 this.updatePositionAxis(originalSequence.length);
+            }
+            
+            toggleNucleotideHighlight(position) {
+                // Toggle highlight: if same position clicked, remove highlight; otherwise, set new position
+                if (this.highlightedPosition === position) {
+                    this.highlightedPosition = null;
+                } else {
+                    this.highlightedPosition = position;
+                    this.scrollToNucleotide(position);
+                }
+                
+                // Update sequence display to reflect highlight changes
+                if (this.data) {
+                    const stepData = this.data.steps[this.currentStep];
+                    this.updateSequenceDisplay(stepData.sequences[this.currentSample]);
+                    
+                    // Also update original sequence if available
+                    if (this.data.metadata.original_samples) {
+                        this.updateOriginalSequence();
+                    }
+                    
+                    // Update score matrix to reflect highlight changes
+                    this.updateScoreMatrix(stepData.score_matrices[this.currentSample]);
+                }
+            }
+            
+            scrollToNucleotide(position) {
+                // Small delay to ensure DOM has been updated after sequence refresh
+                setTimeout(() => {
+                    const sequenceContainer = this.elements.sequenceScrollContainer;
+                    if (!sequenceContainer) return;
+                    
+                    // Find the highlighted nucleotide span
+                    const highlightedSpan = sequenceContainer.querySelector(`[data-position="${position}"]`);
+                    if (!highlightedSpan) return;
+                    
+                    // Get the position of the nucleotide relative to the container
+                    const containerRect = sequenceContainer.getBoundingClientRect();
+                    const spanRect = highlightedSpan.getBoundingClientRect();
+                    
+                    // Calculate scroll position to center the nucleotide horizontally
+                    const containerWidth = sequenceContainer.clientWidth;
+                    const currentScrollLeft = sequenceContainer.scrollLeft;
+                    const spanLeftRelative = spanRect.left - containerRect.left + currentScrollLeft;
+                    const targetScrollLeft = spanLeftRelative - (containerWidth / 2) + (spanRect.width / 2);
+                
+                    // Smooth scroll to the target position
+                    sequenceContainer.scrollTo({
+                        left: Math.max(0, targetScrollLeft),
+                        behavior: 'smooth'
+                    });
+                }, 50); // 50ms delay
             }
             
             updateScoreMatrix(scoreMatrix) {
@@ -1373,14 +1443,22 @@
                 // Add cells with hover tooltips
                 scoreMatrix.forEach((position, posIndex) => {
                     position.forEach((score, baseIndex) => {
-                        svg.append('rect')
+                        const rect = svg.append('rect')
                             .attr('x', 30 + posIndex * cellSize)
                             .attr('y', 15 + baseIndex * cellSize)
                             .attr('width', cellSize - 1)
                             .attr('height', cellSize - 1)
                             .style('fill', colorScale(score))
-                            .style('cursor', 'pointer')
-                            .on('mouseover', function(event) {
+                            .style('cursor', 'pointer');
+                            
+                        // Add highlight border if this position is highlighted
+                        if (this.highlightedPosition === posIndex) {
+                            rect.style('stroke', '#00d4ff')
+                                .style('stroke-width', '2px')
+                                .style('stroke-dasharray', '2,2');
+                        }
+                        
+                        rect.on('mouseover', function(event) {
                                 tooltip
                                     .style('opacity', 1)
                                     .html(`Position: ${posIndex + 1}<br/>Base: ${baseLabels[baseIndex]}<br/>Score: ${score.toFixed(4)}`)
@@ -1394,6 +1472,10 @@
                             })
                             .on('mouseout', function() {
                                 tooltip.style('opacity', 0);
+                            })
+                            .on('click', (event) => {
+                                event.stopPropagation();
+                                this.toggleNucleotideHighlight(posIndex);
                             });
                     });
                 });
