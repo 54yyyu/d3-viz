@@ -862,7 +862,7 @@
                     </div>
                     
                     <div class="viz-section">
-                        <div class="viz-title">Noise Rate vs Steps</div>
+                        <div class="viz-title">Average Score Change vs Steps</div>
                         <div class="chart-container">
                             <canvas id="rateChart"></canvas>
                         </div>
@@ -2103,13 +2103,74 @@
                 return changes;
             }
             
+            calculateScoreChanges(sampleIndex) {
+                if (!this.data || this.data.steps.length < 2) return [];
+                
+                const changes = [];
+                
+                // First step has no previous step to compare to, so 0 change
+                changes.push(0);
+                
+                // Calculate score changes for each subsequent step
+                for (let stepIndex = 1; stepIndex < this.data.steps.length; stepIndex++) {
+                    const currentScoreMatrix = this.data.steps[stepIndex].score_matrices[sampleIndex];
+                    const previousScoreMatrix = this.data.steps[stepIndex - 1].score_matrices[sampleIndex];
+                    
+                    let totalChange = 0;
+                    let positionCount = 0;
+                    
+                    // Compare each base pair position
+                    for (let i = 0; i < currentScoreMatrix.length; i++) {
+                        // Get raw scores for this position
+                        const currentRaw = [
+                            currentScoreMatrix[i][0] || 0,
+                            currentScoreMatrix[i][1] || 0,
+                            currentScoreMatrix[i][2] || 0,
+                            currentScoreMatrix[i][3] || 0
+                        ];
+                        const previousRaw = [
+                            previousScoreMatrix[i][0] || 0,
+                            previousScoreMatrix[i][1] || 0,
+                            previousScoreMatrix[i][2] || 0,
+                            previousScoreMatrix[i][3] || 0
+                        ];
+                        
+                        // NORMALIZE: Convert to probabilities (sum = 1) for each position
+                        const currentSum = currentRaw.reduce((a, b) => a + Math.max(0, b), 0);
+                        const previousSum = previousRaw.reduce((a, b) => a + Math.max(0, b), 0);
+                        
+                        const currentNorm = currentSum > 0 ? 
+                            currentRaw.map(val => Math.max(0, val) / currentSum) : 
+                            [0.25, 0.25, 0.25, 0.25]; // Equal if sum is 0
+                        const previousNorm = previousSum > 0 ? 
+                            previousRaw.map(val => Math.max(0, val) / previousSum) : 
+                            [0.25, 0.25, 0.25, 0.25]; // Equal if sum is 0
+                        
+                        // Calculate position change using normalized values
+                        let positionChange = 0;
+                        for (let j = 0; j < 4; j++) {
+                            positionChange += Math.abs(currentNorm[j] - previousNorm[j]);
+                        }
+                        
+                        totalChange += positionChange;
+                        positionCount++;
+                    }
+                    
+                    // Calculate average change across all positions
+                    const averageChange = positionCount > 0 ? totalChange / positionCount : 0;
+                    changes.push(averageChange);
+                }
+                
+                return changes;
+            }
+            
             updateCharts() {
                 if (!this.data) return;
                 
                 const steps = this.data.steps.map(step => step.step);
                 const mseData = this.data.steps.map(step => step.oracle_mses[this.currentSample]);
                 const noiseData = this.data.steps.map(step => step.noise_level);
-                const rateData = this.data.steps.map(step => step.noise_rate);
+                const scoreChangeData = this.calculateScoreChanges(this.currentSample);
                 const changesData = this.calculateNucleotideChanges(this.currentSample);
                 
                 // Update MSE chart
@@ -2140,11 +2201,11 @@
                     }]
                 };
                 
-                // Update Noise Rate chart
+                // Update Score Change chart
                 this.charts.rate.data = {
                     labels: steps,
                     datasets: [{
-                        data: rateData,
+                        data: scoreChangeData,
                         borderColor: '#96ceb4',
                         backgroundColor: 'rgba(150, 206, 180, 0.1)',
                         fill: true,
