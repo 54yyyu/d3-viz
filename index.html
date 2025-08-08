@@ -131,6 +131,7 @@
             flex: 1;
             overflow-y: auto;
             max-height: var(--sidebar-content-height);
+            padding-bottom: 120px;
         }
         
         .sample-item {
@@ -978,6 +979,7 @@
                 this.elements.playBtn.addEventListener('click', () => this.togglePlay());
                 this.elements.prevBtn.addEventListener('click', () => this.previousStep());
                 this.elements.nextBtn.addEventListener('click', () => this.nextStep());
+                this.elements.speedSlider.addEventListener('input', () => this.updatePlaySpeed());
                 
                 document.querySelectorAll('.toggle-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
@@ -2351,6 +2353,14 @@
                 if (this.playInterval) {
                     clearInterval(this.playInterval);
                     this.playInterval = null;
+                }
+            }
+            
+            updatePlaySpeed() {
+                // If currently playing, restart with new speed
+                if (this.isPlaying) {
+                    this.pause();
+                    this.play();
                 }
             }
             
