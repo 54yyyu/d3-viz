@@ -1421,7 +1421,7 @@
                 
                 // Create color scale
                 const colorScale = d3.scaleSequential(d3.interpolateRdBu)
-                    .domain([1, 0]); // Reversed for blue=low, red=high
+                    .domain([2, 0]); // 1 is now in the middle (white), 2=blue (low), 0=red (high)
                 
                 // Get tooltip element
                 const tooltip = d3.select('#tooltip');
@@ -1961,7 +1961,7 @@
                     const t = i / stops;
                     gradient.append('stop')
                         .attr('offset', `${t * 100}%`)
-                        .attr('stop-color', colorScale(1 - t)); // Reversed to match scale
+                        .attr('stop-color', colorScale(2*t)); // Reversed to match scale
                 }
                 
                 // Apply gradient
