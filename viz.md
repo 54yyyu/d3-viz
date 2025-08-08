@@ -37,6 +37,7 @@ Visualization Data Format Documentation
       │   ├── noise_rate: 0.1
       │   ├── sequence: (batch_size, seq_length)
       │   ├── score_matrix: (batch_size, seq_length, 4)
+      │   ├── prob_matrix: (batch_size, seq_length, 4)
       │   └── oracle_mse: (batch_size,) [evaluation only]
       ├── step_0001/
       │   └── ...
@@ -51,6 +52,7 @@ Visualization Data Format Documentation
   |--------------|-----------------------------|------------|----------------------------------------------------|
   | sequence     | (batch_size, seq_length)    | int64      | Token indices (0=A, 1=C, 2=G, 3=T) at current step |
   | score_matrix | (batch_size, seq_length, 4) | float16/32 | Model's score predictions for each nucleotide      |
+  | prob_matrix  | (batch_size, seq_length, 4) | float16/32 | Probability matrix from staggered score computation |
   | noise_level  | scalar                      | float32    | Current noise level (σ)                            |
   | noise_rate   | scalar                      | float32    | Rate of noise change (dσ/dt)                       |
   | oracle_mse   | (batch_size,)               | float32    | Oracle MSE predictions [evaluation only]           |
@@ -86,6 +88,7 @@ Visualization Data Format Documentation
       step_0 = f['steps/step_0000']
       sequences = np.array(step_0['sequence'])      # (batch_size, seq_length)
       scores = np.array(step_0['score_matrix'])     # (batch_size, seq_length, 4)
+      probs = np.array(step_0['prob_matrix'])       # (batch_size, seq_length, 4)
       noise_level = step_0.attrs['noise_level']    # scalar
 
       # Oracle MSE (if available)
@@ -111,6 +114,7 @@ Visualization Data Format Documentation
   # Read step data (stacked arrays)
   sequences = data['sequences']        # (steps, batch_size, seq_length)
   score_matrices = data['score_matrices']  # (steps, batch_size, seq_length, 4)
+  prob_matrices = data['prob_matrices']    # (steps, batch_size, seq_length, 4)
   noise_levels = data['noise_levels']      # (steps,)
   timesteps = data['timesteps']            # (steps,)
 
@@ -144,7 +148,7 @@ Visualization Data Format Documentation
   | 100     | 249   | 249        | ~140 MB            |
   | 1000    | 249   | 249        | ~1.4 GB            |
 
-  Note: Size includes sequences (int64), score matrices (float16), and metadata
+  Note: Size includes sequences (int64), score/prob matrices (float16), and metadata
 
   Example Usage Commands
 
