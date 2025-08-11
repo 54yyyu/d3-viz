@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/h5wasm@0.4.9/dist/esm/hdf5.js"></script>
     <script src="bundle.js" type="text/javascript"></script>
+    <script src="memesuite-lite-js/memesuite-lite.js" type="text/javascript"></script>
     <style>
         /* Theme variables */
         :root {
@@ -63,11 +64,54 @@
         
         .container {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 280px 1fr 350px;
             grid-template-rows: 60px 1fr 80px;
             height: 100vh;
             gap: 1px;
             background: var(--bg-secondary);
+        }
+        
+        .container.collapsed-tomtom {
+            grid-template-columns: 280px 1fr 0px;
+        }
+        
+        .container.collapsed-tomtom .tomtom-panel {
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            border-left: none;
+        }
+        
+        .container.collapsed-tomtom .tomtom-panel.hover-peek {
+            position: fixed;
+            top: 50%;
+            right: 0;
+            width: 40px;
+            height: 120px;
+            transform: translateY(-50%);
+            z-index: 1001;
+            border-radius: 8px 0 0 8px;
+            border: 1px solid var(--border-color);
+            border-right: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .container.collapsed-tomtom .tomtom-panel.hover-peek:hover {
+            width: 50px;
+            background: var(--input-hover-bg);
+        }
+        
+        .hover-tab-content {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            user-select: none;
+            white-space: nowrap;
         }
         
         .header {
@@ -98,6 +142,8 @@
             padding: 16px;
             display: flex;
             flex-direction: column;
+            min-width: 0; /* Allow flex items to shrink below content size */
+            max-width: 100%;
         }
         
         .controls {
@@ -166,6 +212,8 @@
             gap: 15px;
             max-height: var(--main-content-height);
             overflow-y: auto;
+            width: 100%;
+            max-width: 100%;
         }
         
         .viz-section {
@@ -174,6 +222,8 @@
             padding: 14px;
             border: 1px solid var(--border-color);
             transition: all 0.2s ease;
+            min-width: 0; /* Allow flex items to shrink below content size */
+            max-width: 100%;
         }
         
         .viz-section:hover {
@@ -203,6 +253,9 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
         }
         
         .sequence-scroll-container {
@@ -217,6 +270,7 @@
             flex-direction: column;
             width: max-content;
             min-width: 100%;
+            max-width: 100%;
         }
         
         .position-axis {
@@ -332,12 +386,18 @@
         
         .score-matrix-section.dual-mode.logo-mode .matrix-display {
             max-height: 600px; /* Even taller container for dual logo view */
-            overflow-x: visible; /* Allow horizontal overflow for wide logos */
+            overflow-x: auto; /* Allow horizontal scrolling for wide logos */
+        }
+        
+        .score-matrix-section .matrix-display {
+            overflow-x: auto; /* Allow horizontal scrolling for wide content */
         }
         
         .heatmap-container {
-            display: inline-block;
-            min-width: 100%;
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            max-width: 100%;
         }
         
         .logo-container {
@@ -369,6 +429,9 @@
             background: var(--bg-primary);
             overflow-x: auto; /* Allow horizontal scrolling if content is wider */
             min-height: 200px; /* Ensure minimum height */
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
         }
         
         .matrix-subtitle {
@@ -410,6 +473,8 @@
         .chart-container {
             height: var(--chart-height);
             position: relative;
+            width: 100%;
+            max-width: 100%;
         }
         
         /* Control Styles */
@@ -750,10 +815,549 @@
                 padding: 10px;
             }
         }
+        
+        /* TOMTOM Panel Styles */
+        .tomtom-panel {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        
+        .tomtom-header {
+            background: var(--bg-tertiary);
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .tomtom-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin: 0;
+        }
+        
+        .tomtom-toggle {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 16px;
+        }
+        
+        .tomtom-toggle:hover {
+            background: var(--input-hover-bg);
+        }
+        
+        .tomtom-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .tomtom-section {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .tomtom-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 12px;
+        }
+        
+        .selection-info {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .selection-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .selection-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+        
+        .selection-btn:hover {
+            background: var(--input-hover-bg);
+        }
+        
+        .selection-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            background: var(--bg-tertiary);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--accent-primary);
+            background: var(--bg-quaternary);
+        }
+        
+        .upload-area.has-file {
+            border-color: var(--success-color, #4ecdc4);
+            background: var(--bg-quaternary);
+        }
+        
+        .upload-icon {
+            font-size: 24px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .upload-text {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .file-name {
+            color: var(--success-color, #4ecdc4);
+            font-weight: 500;
+            font-size: 11px;
+        }
+        
+        .param-group {
+            margin-bottom: 15px;
+        }
+        
+        .param-label {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            display: block;
+        }
+        
+        .param-input {
+            width: 100%;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        
+        .param-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+        }
+        
+        .param-slider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .param-range {
+            flex: 1;
+            height: 3px;
+            background: var(--input-bg);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .param-range::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .param-value {
+            font-size: 10px;
+            color: var(--text-secondary);
+            min-width: 40px;
+            text-align: right;
+        }
+        
+        .run-tomtom-btn {
+            width: 100%;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .run-tomtom-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+        }
+        
+        .run-tomtom-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .tomtom-results {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .result-item:hover {
+            background: var(--input-hover-bg);
+            border-color: var(--accent-primary);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .result-name {
+            font-weight: 500;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        
+        .result-score {
+            font-size: 11px;
+            color: var(--accent-primary);
+        }
+        
+        .result-details {
+            font-size: 10px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        /* Selection overlay styles */
+        .matrix-selection-overlay {
+            position: absolute;
+            background: rgba(0, 212, 255, 0.2);
+            border: 2px solid var(--accent-primary);
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .heatmap-container {
+            position: relative;
+        }
+        
+        .selection-mode .heatmap-container {
+            cursor: crosshair;
+        }
+        
+        /* Selection highlights in matrix */
+        .matrix-cell-selected {
+            stroke: var(--accent-primary) !important;
+            stroke-width: 2px !important;
+            stroke-opacity: 0.8 !important;
+        }
+        
+        .matrix-position-selected {
+            background: rgba(0, 212, 255, 0.3) !important;
+        }
+        
+        .success-color { color: #4ecdc4; }
+        .warning-color { color: #ffa726; }
+        .error-color { color: #ef5350; }
+        
+        /* Enhanced results table styles */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .results-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+        
+        .export-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+        
+        .export-btn:hover {
+            background: var(--accent-secondary);
+        }
+        
+        .results-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        .results-table th {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .results-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        
+        .result-row:hover {
+            background: var(--hover-bg);
+        }
+        
+        .motif-name {
+            font-weight: 500;
+            color: var(--accent-primary);
+        }
+        
+        .p-value {
+            font-family: monospace;
+            color: var(--text-secondary);
+        }
+        
+        .strand.positive {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        
+        .strand.negative {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .alignment {
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .detail-btn {
+            background: var(--button-bg);
+            color: var(--button-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        
+        .detail-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+        
+        .motif-detail-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            width: 450px;
+            max-height: 70vh;
+            overflow: hidden;
+            cursor: move;
+        }
+        
+        .motif-detail-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            z-index: -1;
+            border-radius: 12px;
+        }
+        
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        
+        .detail-header h5 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+        
+        .detail-header button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .detail-header button:hover {
+            background: var(--input-hover-bg);
+        }
+        
+        .detail-content {
+            padding: 20px;
+            max-height: calc(70vh - 80px);
+            overflow-y: auto;
+            background: var(--bg-primary);
+        }
+        
+        .logo-comparison {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            align-items: center;
+        }
+        
+        .logo-container {
+            text-align: center;
+            width: 100%;
+            max-width: 350px;
+        }
+        
+        .logo-container h6 {
+            margin: 0 0 15px 0;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .motif-logo {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .no-results-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .no-results h4 {
+            margin: 0 0 10px 0;
+            color: var(--text-primary);
+        }
+        
+        .no-results p {
+            margin: 0;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container collapsed-tomtom">
         <header class="header">
             <h1>🧬 D3-DNA Diffusion Visualizer</h1>
             <div style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
@@ -886,6 +1490,92 @@
             </div>
         </main>
         
+        <!-- TOMTOM Panel -->
+        <div class="tomtom-panel collapsed" id="tomtomPanel">
+            <div class="tomtom-header">
+                <h3 class="tomtom-title">TOMTOM Analysis</h3>
+                <button class="tomtom-toggle" id="tomtomToggle" title="Toggle TOMTOM Panel">
+                    <span id="tomtomToggleIcon">▶</span>
+                </button>
+            </div>
+            
+            <div class="tomtom-content">
+                <!-- Selection Section -->
+                <div class="tomtom-section">
+                    <div class="tomtom-section-title">Matrix Selection</div>
+                    
+                    <div class="selection-info" id="selectionInfo">
+                        <div id="selectionStatus">Click and drag on the matrix to select a region</div>
+                        <div id="selectionDetails" style="margin-top: 5px; display: none;">
+                            Selection: Position <span id="selectionStart">-</span> to <span id="selectionEnd">-</span> 
+                            (<span id="selectionLength">0</span> positions)
+                        </div>
+                    </div>
+                    
+                    <div class="selection-controls">
+                        <button class="selection-btn" id="enableSelection">Enable Selection</button>
+                        <button class="selection-btn" id="clearSelection">Clear</button>
+                        <button class="selection-btn" id="selectAll">Select All</button>
+                    </div>
+                </div>
+                
+                <!-- Database Upload Section -->
+                <div class="tomtom-section">
+                    <div class="tomtom-section-title">Motif Database</div>
+                    
+                    <div class="upload-area" id="databaseUpload" onclick="document.getElementById('databaseFile').click()">
+                        <div class="upload-icon">📁</div>
+                        <div class="upload-text">
+                            Click to upload MEME database file
+                            <br><small>(.meme, .txt formats)</small>
+                        </div>
+                        <div class="file-name" id="databaseFileName"></div>
+                    </div>
+                    <input type="file" id="databaseFile" accept=".meme,.txt" style="display: none;">
+                </div>
+                
+                <!-- Parameters Section -->
+                <div class="tomtom-section">
+                    <div class="tomtom-section-title">Parameters</div>
+                    
+                    <div class="param-group">
+                        <label class="param-label">P-value Threshold</label>
+                        <div class="param-slider">
+                            <input type="range" class="param-range" id="pvalueThreshold" 
+                                   min="-5" max="1" step="0.1" value="-3">
+                            <span class="param-value" id="pvalueValue">1.0e-3</span>
+                        </div>
+                    </div>
+                    
+                    <div class="param-group">
+                        <label class="param-label">Max Results</label>
+                        <input type="number" class="param-input" id="maxResults" value="10" min="1" max="100">
+                    </div>
+                    
+                    <div class="param-group">
+                        <label class="param-label">
+                            <input type="checkbox" id="includeRC" checked> Include reverse complement
+                        </label>
+                    </div>
+                    
+                    <button class="run-tomtom-btn" id="runTomtom" disabled>Run TOMTOM Analysis</button>
+                </div>
+                
+                <!-- Results Section -->
+                <div class="tomtom-section" id="resultsSection" style="display: none;">
+                    <div class="tomtom-section-title">Results</div>
+                    
+                    <div class="tomtom-results" id="tomtomResults">
+                        <!-- Results will be populated here -->
+                    </div>
+                    
+                    <button class="selection-btn" id="exportResults" style="margin-top: 10px; width: 100%;">
+                        Export Results
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <div class="controls">
             <div class="control-group">
                 <button class="control-btn" id="playBtn" title="Play/Pause">
@@ -926,6 +1616,15 @@
                 this.highlightedPosition = null; // Track highlighted nucleotide position
                 this.isScrollingSyncronized = false; // Prevent infinite scroll loop
                 this.scrollHandlers = null; // Store scroll event handlers for cleanup
+                
+                // TOMTOM-related properties
+                this.selectionMode = false;
+                this.isSelecting = false;
+                this.selectionStart = null;
+                this.selectionEnd = null;
+                this.selectedRange = null;
+                this.uploadedDatabase = null;
+                this.tomtomResults = null;
                 
                 this.initializeElements();
                 this.setupEventListeners();
@@ -969,7 +1668,31 @@
                     nextBtn: document.getElementById('nextBtn'),
                     speedSlider: document.getElementById('speedSlider'),
                     themeToggle: document.getElementById('themeToggle'),
-                    themeIcon: document.getElementById('themeIcon')
+                    themeIcon: document.getElementById('themeIcon'),
+                    // TOMTOM elements
+                    tomtomPanel: document.getElementById('tomtomPanel'),
+                    tomtomToggle: document.getElementById('tomtomToggle'),
+                    tomtomToggleIcon: document.getElementById('tomtomToggleIcon'),
+                    enableSelection: document.getElementById('enableSelection'),
+                    clearSelection: document.getElementById('clearSelection'),
+                    selectAll: document.getElementById('selectAll'),
+                    selectionInfo: document.getElementById('selectionInfo'),
+                    selectionStatus: document.getElementById('selectionStatus'),
+                    selectionDetails: document.getElementById('selectionDetails'),
+                    selectionStart: document.getElementById('selectionStart'),
+                    selectionEnd: document.getElementById('selectionEnd'),
+                    selectionLength: document.getElementById('selectionLength'),
+                    databaseUpload: document.getElementById('databaseUpload'),
+                    databaseFile: document.getElementById('databaseFile'),
+                    databaseFileName: document.getElementById('databaseFileName'),
+                    pvalueThreshold: document.getElementById('pvalueThreshold'),
+                    pvalueValue: document.getElementById('pvalueValue'),
+                    maxResults: document.getElementById('maxResults'),
+                    includeRC: document.getElementById('includeRC'),
+                    runTomtom: document.getElementById('runTomtom'),
+                    resultsSection: document.getElementById('resultsSection'),
+                    tomtomResults: document.getElementById('tomtomResults'),
+                    exportResults: document.getElementById('exportResults')
                 };
             }
             
@@ -999,6 +1722,17 @@
                 
                 // Window resize
                 window.addEventListener('resize', () => this.handleResize());
+                
+                // Global mouse events for selection
+                document.addEventListener('mouseup', () => {
+                    if (this.isSelecting) {
+                        this.isSelecting = false;
+                        this.finalizeSelection();
+                    }
+                });
+                
+                // TOMTOM event listeners
+                this.setupTomtomEventListeners();
             }
             
             handleKeydown(event) {
@@ -1047,14 +1781,47 @@
                 // Debounce resize events to prevent excessive recalculation
                 clearTimeout(this.resizeTimeout);
                 this.resizeTimeout = setTimeout(() => {
-                    this.updateViewportSizes();
-                    // Refresh charts to fit new size
-                    if (this.charts) {
-                        Object.values(this.charts).forEach(chart => {
-                            if (chart.resize) chart.resize();
-                        });
-                    }
+                    this.handleLayoutChange();
                 }, 150);
+            }
+            
+            handleLayoutChange() {
+                // Update viewport-based sizing
+                this.updateViewportSizes();
+                
+                // Refresh charts to fit new size
+                if (this.charts) {
+                    Object.values(this.charts).forEach(chart => {
+                        if (chart.resize) {
+                            chart.resize();
+                        }
+                    });
+                }
+                
+                // Refresh visualizations to fit new container width
+                this.refreshVisualizationSizes();
+            }
+            
+            refreshVisualizationSizes() {
+                if (!this.data) return;
+                
+                // Get current step data
+                const stepData = this.data.steps[this.currentStep];
+                const sampleData = {
+                    sequence: stepData.sequences[this.currentSample],
+                    scoreMatrix: stepData.score_matrices[this.currentSample],
+                    probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                    oracleMse: stepData.oracle_mses[this.currentSample]
+                };
+                
+                // Force refresh of matrix/logo visualizations
+                this.updateMatrix(sampleData);
+                
+                // Force refresh sequence display
+                this.updateSequenceDisplay(sampleData.sequence);
+                if (this.data.metadata.original_samples) {
+                    this.updateOriginalSequence();
+                }
             }
             
             updateViewportSizes() {
@@ -1166,6 +1933,1075 @@
                         chart.update('none');
                     }
                 });
+            }
+            
+            // =====================================================
+            // TOMTOM FUNCTIONALITY
+            // =====================================================
+            
+            setupTomtomEventListeners() {
+                // Panel toggle
+                this.elements.tomtomToggle.addEventListener('click', () => this.toggleTomtomPanel());
+                
+                // Selection controls
+                this.elements.enableSelection.addEventListener('click', () => this.toggleSelectionMode());
+                this.elements.clearSelection.addEventListener('click', () => this.clearSelection());
+                this.elements.selectAll.addEventListener('click', () => this.selectAllPositions());
+                
+                // Database upload
+                this.elements.databaseFile.addEventListener('change', (e) => this.handleDatabaseUpload(e));
+                this.setupDragAndDrop();
+                
+                // Parameter controls
+                this.elements.pvalueThreshold.addEventListener('input', (e) => {
+                    const value = Math.pow(10, parseFloat(e.target.value));
+                    this.elements.pvalueValue.textContent = value.toExponential(1);
+                });
+                
+                this.elements.maxResults.addEventListener('input', () => this.updateRunButtonState());
+                this.elements.includeRC.addEventListener('change', () => this.updateRunButtonState());
+                
+                // TOMTOM execution
+                this.elements.runTomtom.addEventListener('click', () => this.runTomtomAnalysis());
+                
+                // Results export
+                this.elements.exportResults.addEventListener('click', () => this.exportTomtomResults());
+                
+                // Setup hover trigger for collapsed panel
+                this.setupHoverTrigger();
+            }
+            
+            toggleTomtomPanel() {
+                const container = document.querySelector('.container');
+                const panel = this.elements.tomtomPanel;
+                const icon = this.elements.tomtomToggleIcon;
+                
+                const isCollapsed = panel.classList.contains('collapsed');
+                
+                if (isCollapsed) {
+                    // Show panel
+                    container.classList.remove('collapsed-tomtom');
+                    panel.classList.remove('collapsed');
+                    panel.classList.remove('hover-peek');
+                    icon.textContent = '◀';
+                } else {
+                    // Hide panel
+                    container.classList.add('collapsed-tomtom');
+                    panel.classList.add('collapsed');
+                    icon.textContent = '▶';
+                }
+                
+                // Trigger resize after layout change to update content
+                setTimeout(() => {
+                    this.handleLayoutChange();
+                }, 300); // Wait for CSS transition to complete
+            }
+            
+            setupHoverTrigger() {
+                // Create hover trigger area
+                const hoverTrigger = document.createElement('div');
+                hoverTrigger.id = 'tomtom-hover-trigger';
+                hoverTrigger.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    right: 0;
+                    width: 20px;
+                    height: 100vh;
+                    background: transparent;
+                    z-index: 1000;
+                    display: none;
+                    pointer-events: auto;
+                `;
+                
+                document.body.appendChild(hoverTrigger);
+                
+                // Show/hide trigger based on panel state
+                const updateTriggerVisibility = () => {
+                    const container = document.querySelector('.container');
+                    const isCollapsed = container.classList.contains('collapsed-tomtom');
+                    hoverTrigger.style.display = isCollapsed ? 'block' : 'none';
+                };
+                
+                // Initial state
+                updateTriggerVisibility();
+                
+                // Update on panel toggle
+                const observer = new MutationObserver(updateTriggerVisibility);
+                observer.observe(document.querySelector('.container'), {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+                
+                // Hover events
+                hoverTrigger.addEventListener('mouseenter', () => {
+                    const panel = this.elements.tomtomPanel;
+                    const container = document.querySelector('.container');
+                    if (container.classList.contains('collapsed-tomtom')) {
+                        panel.classList.add('hover-peek');
+                        // Add tab content
+                        panel.innerHTML = '<div class="hover-tab-content">TOMTOM</div>';
+                        
+                        // Add click handler to expand permanently
+                        panel.onclick = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.expandTomtomPanel();
+                        };
+                    }
+                });
+                
+                hoverTrigger.addEventListener('mouseleave', () => {
+                    // Small delay to allow moving to panel
+                    setTimeout(() => {
+                        if (!this.elements.tomtomPanel.matches(':hover')) {
+                            this.hideHoverTab();
+                        }
+                    }, 100);
+                });
+                
+                // Panel hover to keep it visible
+                this.elements.tomtomPanel.addEventListener('mouseenter', () => {
+                    const container = document.querySelector('.container');
+                    if (container.classList.contains('collapsed-tomtom')) {
+                        this.elements.tomtomPanel.classList.add('hover-peek');
+                    }
+                });
+                
+                // Mouse leave to hide panel
+                this.elements.tomtomPanel.addEventListener('mouseleave', () => {
+                    const container = document.querySelector('.container');
+                    if (container.classList.contains('collapsed-tomtom')) {
+                        this.hideHoverTab();
+                    }
+                });
+            }
+            
+            expandTomtomPanel() {
+                const container = document.querySelector('.container');
+                const panel = this.elements.tomtomPanel;
+                const icon = this.elements.tomtomToggleIcon;
+                
+                // Restore original panel content
+                this.restorePanelContent();
+                
+                // Show panel permanently
+                container.classList.remove('collapsed-tomtom');
+                panel.classList.remove('collapsed');
+                panel.classList.remove('hover-peek');
+                panel.onclick = null; // Remove click handler
+                icon.textContent = '◀';
+            }
+            
+            hideHoverTab() {
+                const panel = this.elements.tomtomPanel;
+                const container = document.querySelector('.container');
+                
+                if (container.classList.contains('collapsed-tomtom')) {
+                    panel.classList.remove('hover-peek');
+                    panel.onclick = null; // Remove click handler
+                }
+            }
+            
+            restorePanelContent() {
+                // Restore the original TOMTOM panel HTML content
+                const originalContent = `
+                    <div class="tomtom-header">
+                        <h3 class="tomtom-title">TOMTOM Analysis</h3>
+                        <button class="tomtom-toggle" id="tomtomToggle" title="Toggle TOMTOM Panel">
+                            <span id="tomtomToggleIcon">▶</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tomtom-content">
+                        <!-- Selection Section -->
+                        <div class="tomtom-section">
+                            <div class="tomtom-section-title">Matrix Selection</div>
+                            
+                            <div class="selection-info" id="selectionInfo">
+                                <div id="selectionStatus">Click and drag on the matrix to select a region</div>
+                                <div id="selectionDetails" style="margin-top: 5px; display: none;">
+                                    Selection: Position <span id="selectionStart">-</span> to <span id="selectionEnd">-</span> 
+                                    (<span id="selectionLength">0</span> positions)
+                                </div>
+                            </div>
+                            
+                            <div class="selection-controls">
+                                <button class="selection-btn" id="enableSelection">Enable Selection</button>
+                                <button class="selection-btn" id="clearSelection">Clear</button>
+                                <button class="selection-btn" id="selectAll">Select All</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Database Upload Section -->
+                        <div class="tomtom-section">
+                            <div class="tomtom-section-title">Motif Database</div>
+                            
+                            <div class="upload-area" id="databaseUpload" onclick="document.getElementById('databaseFile').click()">
+                                <div class="upload-icon">📁</div>
+                                <div class="upload-text">
+                                    Click to upload MEME database file
+                                    <br><small>(.meme, .txt formats)</small>
+                                </div>
+                                <div class="file-name" id="databaseFileName"></div>
+                            </div>
+                            <input type="file" id="databaseFile" accept=".meme,.txt" style="display: none;">
+                        </div>
+                        
+                        <!-- Parameters Section -->
+                        <div class="tomtom-section">
+                            <div class="tomtom-section-title">Parameters</div>
+                            
+                            <div class="param-group">
+                                <label class="param-label">P-value Threshold</label>
+                                <div class="param-slider">
+                                    <input type="range" class="param-range" id="pvalueThreshold" 
+                                           min="-5" max="1" step="0.1" value="-3">
+                                    <span class="param-value" id="pvalueValue">1.0e-3</span>
+                                </div>
+                            </div>
+                            
+                            <div class="param-group">
+                                <label class="param-label">Max Results</label>
+                                <input type="number" class="param-input" id="maxResults" value="10" min="1" max="100">
+                            </div>
+                            
+                            <div class="param-group">
+                                <label class="param-label">
+                                    <input type="checkbox" id="includeRC" checked> Include reverse complement
+                                </label>
+                            </div>
+                            
+                            <button class="run-tomtom-btn" id="runTomtom" disabled>Run TOMTOM Analysis</button>
+                        </div>
+                        
+                        <!-- Results Section -->
+                        <div class="tomtom-section" id="resultsSection" style="display: none;">
+                            <div class="tomtom-section-title">Results</div>
+                            
+                            <div class="tomtom-results" id="tomtomResults">
+                                <!-- Results will be populated here -->
+                            </div>
+                            
+                            <button class="selection-btn" id="exportResults" style="margin-top: 10px; width: 100%;">
+                                Export Results
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                this.elements.tomtomPanel.innerHTML = originalContent;
+                
+                // Re-initialize the element references and event listeners
+                this.initializeTomtomElements();
+            }
+            
+            initializeTomtomElements() {
+                // Re-initialize element references after content restoration
+                this.elements.tomtomToggle = document.getElementById('tomtomToggle');
+                this.elements.tomtomToggleIcon = document.getElementById('tomtomToggleIcon');
+                this.elements.selectionInfo = document.getElementById('selectionInfo');
+                this.elements.selectionStatus = document.getElementById('selectionStatus');
+                this.elements.selectionDetails = document.getElementById('selectionDetails');
+                this.elements.selectionStart = document.getElementById('selectionStart');
+                this.elements.selectionEnd = document.getElementById('selectionEnd');
+                this.elements.selectionLength = document.getElementById('selectionLength');
+                this.elements.enableSelection = document.getElementById('enableSelection');
+                this.elements.clearSelection = document.getElementById('clearSelection');
+                this.elements.selectAll = document.getElementById('selectAll');
+                this.elements.databaseUpload = document.getElementById('databaseUpload');
+                this.elements.databaseFile = document.getElementById('databaseFile');
+                this.elements.databaseFileName = document.getElementById('databaseFileName');
+                this.elements.pvalueThreshold = document.getElementById('pvalueThreshold');
+                this.elements.pvalueValue = document.getElementById('pvalueValue');
+                this.elements.maxResults = document.getElementById('maxResults');
+                this.elements.includeRC = document.getElementById('includeRC');
+                this.elements.runTomtom = document.getElementById('runTomtom');
+                this.elements.resultsSection = document.getElementById('resultsSection');
+                this.elements.tomtomResults = document.getElementById('tomtomResults');
+                this.elements.exportResults = document.getElementById('exportResults');
+                
+                // Re-setup event listeners for TOMTOM functionality
+                this.setupTomtomEventListeners();
+            }
+            
+            toggleSelectionMode() {
+                this.selectionMode = !this.selectionMode;
+                const btn = this.elements.enableSelection;
+                
+                if (this.selectionMode) {
+                    btn.textContent = 'Disable Selection';
+                    btn.classList.add('active');
+                    document.body.classList.add('selection-mode');
+                    this.elements.selectionStatus.textContent = 'Selection mode enabled - click and drag on matrix';
+                } else {
+                    btn.textContent = 'Enable Selection';
+                    btn.classList.remove('active');
+                    document.body.classList.remove('selection-mode');
+                    this.elements.selectionStatus.textContent = 'Click and drag on the matrix to select a region';
+                    this.clearSelection();
+                }
+            }
+            
+            clearSelection() {
+                this.selectedRange = null;
+                this.selectionStart = null;
+                this.selectionEnd = null;
+                this.elements.selectionDetails.style.display = 'none';
+                
+                // Clear visual highlights
+                this.clearSelectionHighlights();
+                
+                // Refresh matrix display to remove SVG selection overlays
+                if (this.data && this.data.steps && this.data.steps[this.currentStep]) {
+                    const stepData = this.data.steps[this.currentStep];
+                    const sampleData = {
+                        sequence: stepData.sequences[this.currentSample],
+                        scoreMatrix: stepData.score_matrices[this.currentSample],
+                        probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        oracleMse: stepData.oracle_mses[this.currentSample]
+                    };
+                    this.updateMatrix(sampleData);
+                }
+                
+                this.updateRunButtonState();
+            }
+            
+            selectAllPositions() {
+                if (!this.data) return;
+                
+                const stepData = this.data.steps[this.currentStep];
+                const matrix = stepData.score_matrices[this.currentSample];
+                
+                this.selectedRange = {
+                    start: 0,
+                    end: matrix.length - 1
+                };
+                
+                this.updateSelectionDisplay();
+                this.highlightSelectedRange();
+                this.updateRunButtonState();
+            }
+            
+            updateSelectionDisplay() {
+                if (this.selectedRange) {
+                    this.elements.selectionStart.textContent = this.selectedRange.start + 1;
+                    this.elements.selectionEnd.textContent = this.selectedRange.end + 1;
+                    this.elements.selectionLength.textContent = this.selectedRange.end - this.selectedRange.start + 1;
+                    this.elements.selectionDetails.style.display = 'block';
+                    this.elements.selectionStatus.textContent = 'Region selected';
+                } else {
+                    this.elements.selectionDetails.style.display = 'none';
+                }
+            }
+            
+            finalizeSelection() {
+                if (this.selectionStart !== null && this.selectionEnd !== null) {
+                    const start = Math.min(this.selectionStart, this.selectionEnd);
+                    const end = Math.max(this.selectionStart, this.selectionEnd);
+                    this.selectedRange = { start, end };
+                    
+                    // Remove active selection overlays
+                    document.querySelectorAll('.selection-overlay-active').forEach(el => el.remove());
+                    
+                    this.updateSelectionDisplay();
+                    
+                    // Refresh matrix display to show permanent selection highlights
+                    if (this.data && this.data.steps && this.data.steps[this.currentStep]) {
+                        const stepData = this.data.steps[this.currentStep];
+                        const sampleData = {
+                            sequence: stepData.sequences[this.currentSample],
+                            scoreMatrix: stepData.score_matrices[this.currentSample],
+                            probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                            oracleMse: stepData.oracle_mses[this.currentSample]
+                        };
+                        this.updateMatrix(sampleData);
+                    }
+                    
+                    this.updateRunButtonState();
+                }
+                
+                // Reset selection state
+                this.selectionStart = null;
+                this.selectionEnd = null;
+            }
+            
+            highlightSelectedRange() {
+                // Selection highlighting is now handled directly in the SVG rendering
+                // This method is kept for compatibility but the actual highlighting
+                // happens in updateHeatmapInContainer through the SVG overlay
+                return;
+            }
+            
+            clearSelectionHighlights() {
+                // Remove any remaining DOM-based selection overlays
+                document.querySelectorAll('.matrix-selection-overlay').forEach(el => el.remove());
+                document.querySelectorAll('.selection-overlay-active').forEach(el => el.remove());
+                
+                // Remove cell highlight classes (though we now use SVG-based highlighting)
+                document.querySelectorAll('.matrix-cell-selected').forEach(el => {
+                    el.classList.remove('matrix-cell-selected');
+                });
+            }
+            
+            startSelection(posIndex, container) {
+                this.isSelecting = true;
+                this.selectionStart = posIndex;
+                this.selectionEnd = posIndex;
+                this.createSelectionOverlay(container);
+                this.updateSelectionOverlay(container);
+                this.updateSelectionDisplay();
+            }
+            
+            updateSelectionEnd(posIndex, container) {
+                this.selectionEnd = posIndex;
+                this.updateSelectionOverlay(container);
+                this.updateSelectionDisplay();
+            }
+            
+            createSelectionOverlay(container) {
+                // Remove existing overlay first
+                const existingOverlay = container.querySelector('.selection-overlay-active');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+                
+                // Create new overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'selection-overlay-active';
+                overlay.style.position = 'absolute';
+                overlay.style.background = 'rgba(251, 146, 60, 0.2)';
+                overlay.style.border = '2px dotted #fb923c';
+                overlay.style.borderRadius = '2px';
+                overlay.style.pointerEvents = 'none';
+                overlay.style.zIndex = '10';
+                
+                container.style.position = 'relative';
+                container.appendChild(overlay);
+            }
+            
+            updateSelectionOverlay(container) {
+                const overlay = container.querySelector('.selection-overlay-active');
+                if (!overlay || this.selectionStart === null || this.selectionEnd === null) return;
+                
+                const cellSize = 12;
+                const start = Math.min(this.selectionStart, this.selectionEnd);
+                const end = Math.max(this.selectionStart, this.selectionEnd);
+                
+                overlay.style.left = (30 + start * cellSize) + 'px';
+                overlay.style.top = '15px';
+                overlay.style.width = ((end - start + 1) * cellSize) + 'px';
+                overlay.style.height = (4 * cellSize) + 'px';
+            }
+            
+            startLogoSelection(posIndex, container, leftOffset, positionWidth) {
+                this.isSelecting = true;
+                this.selectionStart = posIndex;
+                this.selectionEnd = posIndex;
+                this.createLogoSelectionOverlay(container, leftOffset, positionWidth);
+                this.updateLogoSelectionOverlay(container, leftOffset, positionWidth);
+                this.updateSelectionDisplay();
+            }
+            
+            updateLogoSelectionEnd(posIndex, container, leftOffset, positionWidth) {
+                this.selectionEnd = posIndex;
+                this.updateLogoSelectionOverlay(container, leftOffset, positionWidth);
+                this.updateSelectionDisplay();
+            }
+            
+            createLogoSelectionOverlay(container, leftOffset, positionWidth) {
+                // Remove existing overlay first
+                const existingOverlay = container.querySelector('.selection-overlay-active');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+                
+                // Create new overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'selection-overlay-active';
+                overlay.style.position = 'absolute';
+                overlay.style.background = 'rgba(251, 146, 60, 0.2)';
+                overlay.style.border = '2px dotted #fb923c';
+                overlay.style.borderRadius = '2px';
+                overlay.style.pointerEvents = 'none';
+                overlay.style.zIndex = '10';
+                
+                container.appendChild(overlay);
+            }
+            
+            updateLogoSelectionOverlay(container, leftOffset, positionWidth) {
+                const overlay = container.querySelector('.selection-overlay-active');
+                if (!overlay || this.selectionStart === null || this.selectionEnd === null) return;
+                
+                const start = Math.min(this.selectionStart, this.selectionEnd);
+                const end = Math.max(this.selectionStart, this.selectionEnd);
+                
+                overlay.style.left = (leftOffset + start * positionWidth) + 'px';
+                overlay.style.top = '20px';
+                overlay.style.width = ((end - start + 1) * positionWidth) + 'px';
+                overlay.style.height = 'calc(100% - 40px)';
+            }
+            
+            setupDragAndDrop() {
+                const uploadArea = this.elements.databaseUpload;
+                
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, () => {
+                        uploadArea.classList.add('dragover');
+                    });
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, () => {
+                        uploadArea.classList.remove('dragover');
+                    });
+                });
+                
+                uploadArea.addEventListener('drop', (e) => {
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.elements.databaseFile.files = files;
+                        this.handleDatabaseUpload({ target: { files } });
+                    }
+                });
+            }
+            
+            async handleDatabaseUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                try {
+                    const text = await file.text();
+                    
+                    // Validate MEME format
+                    if (!this.validateMemeFormat(text)) {
+                        throw new Error('Invalid MEME format. Please upload a valid MEME file.');
+                    }
+                    
+                    this.uploadedDatabase = text;
+                    this.elements.databaseFileName.textContent = file.name;
+                    this.elements.databaseUpload.classList.add('has-file');
+                    this.updateRunButtonState();
+                    
+                } catch (error) {
+                    console.error('Database upload error:', error);
+                    alert('Error uploading database: ' + error.message);
+                }
+            }
+            
+            validateMemeFormat(content) {
+                if (!content || content.trim().length === 0) return false;
+                
+                const lines = content.split('\n').map(line => line.trim());
+                const hasVersion = lines.some(line => line.startsWith('MEME version'));
+                const hasAlphabet = lines.some(line => line.startsWith('ALPHABET='));
+                const hasMotif = lines.some(line => line.startsWith('MOTIF '));
+                
+                return hasVersion && hasAlphabet && hasMotif;
+            }
+            
+            updateRunButtonState() {
+                const hasSelection = this.selectedRange !== null;
+                const hasDatabase = this.uploadedDatabase !== null;
+                const hasParams = this.elements.maxResults.value > 0;
+                
+                this.elements.runTomtom.disabled = !(hasSelection && hasDatabase && hasParams);
+            }
+            
+            async runTomtomAnalysis() {
+                if (!this.selectedRange || !this.uploadedDatabase) {
+                    alert('Please select a matrix region and upload a motif database.');
+                    return;
+                }
+                
+                try {
+                    this.elements.runTomtom.disabled = true;
+                    this.elements.runTomtom.textContent = 'Running...';
+                    
+                    // Extract selected motif
+                    const selectedMotif = this.extractSelectedMotif();
+                    
+                    // Run TOMTOM using memesuite-lite.js
+                    const results = await this.performTomtomComparison(selectedMotif);
+                    
+                    // Display results
+                    this.displayTomtomResults(results);
+                    
+                } catch (error) {
+                    console.error('TOMTOM analysis error:', error);
+                    alert('TOMTOM analysis failed: ' + error.message);
+                } finally {
+                    this.elements.runTomtom.disabled = false;
+                    this.elements.runTomtom.textContent = 'Run TOMTOM Analysis';
+                }
+            }
+            
+            extractSelectedMotif() {
+                const stepData = this.data.steps[this.currentStep];
+                const matrix = this.matrixType === 'prob' && stepData.prob_matrices ? 
+                    stepData.prob_matrices[this.currentSample] : 
+                    stepData.score_matrices[this.currentSample];
+                
+                // Extract the selected region
+                const selectedMatrix = matrix.slice(this.selectedRange.start, this.selectedRange.end + 1);
+                
+                // Convert to MEME format
+                return this.convertToMemeFormat(selectedMatrix);
+            }
+            
+            convertToMemeFormat(matrix) {
+                const motifName = `Selected_Region_${this.selectedRange.start + 1}_${this.selectedRange.end + 1}`;
+                const alphabet = 'ACGT';
+                const length = matrix.length;
+                
+                let memeContent = `MEME version 4\n\nALPHABET= ${alphabet}\n\nstrands: + -\n\n`;
+                memeContent += `Background letter frequencies\nA 0.25 C 0.25 G 0.25 T 0.25\n\n`;
+                memeContent += `MOTIF ${motifName}\nletter-probability matrix: alength= 4 w= ${length} nsites= 20 E= 0\n`;
+                
+                matrix.forEach(position => {
+                    // Normalize to probabilities if needed
+                    const total = position.reduce((a, b) => a + Math.max(0, b), 0);
+                    const normalized = total > 0 ? 
+                        position.map(val => Math.max(0, val) / total) : 
+                        [0.25, 0.25, 0.25, 0.25];
+                    
+                    memeContent += normalized.map(val => val.toFixed(6)).join(' ') + '\n';
+                });
+                
+                return memeContent;
+            }
+            
+            async performTomtomComparison(queryMotif) {
+                try {
+                    if (!this.uploadedDatabase) {
+                        throw new Error('No database uploaded');
+                    }
+                    
+                    // Initialize MemeSuite-Lite
+                    const memeSuite = new MemeSuiteLite();
+                    
+                    // Get threshold and max results from UI
+                    const threshold = Math.pow(10, parseFloat(this.elements.pvalueThreshold.value)) || 0.001;
+                    const maxResults = parseInt(this.elements.maxResults.value) || 10;
+                    
+                    // Run TOMTOM analysis
+                    const results = memeSuite.runTomtom(queryMotif, this.uploadedDatabase, {
+                        threshold: threshold,
+                        reverseComplement: this.elements.includeRC.checked
+                    });
+                    
+                    // Parse results and convert to our format
+                    const queryMotifs = memeSuite.readMeme(queryMotif);
+                    const targetMotifs = memeSuite.readMeme(this.uploadedDatabase);
+                    const targetNames = Object.keys(targetMotifs);
+                    const queryNames = Object.keys(queryMotifs);
+                    
+                    const matches = [];
+                    
+                    // Process results (pValues is a 2D array: queries x targets)
+                    if (results.pValues && results.pValues.length > 0 && queryNames.length > 0) {
+                        const queryIdx = 0; // We're comparing a single query motif
+                        
+                        // Process ALL motifs in the database
+                        for (let targetIdx = 0; targetIdx < targetNames.length; targetIdx++) {
+                            const pValue = results.pValues[queryIdx][targetIdx];
+                            const score = results.scores[queryIdx][targetIdx];
+                            const offset = results.offsets[queryIdx][targetIdx];
+                            const overlap = results.overlaps[queryIdx][targetIdx];
+                            const strand = results.strands[queryIdx][targetIdx] === 0 ? '+' : '-';
+                            
+                            if (pValue <= threshold) {
+                                matches.push({
+                                    name: targetNames[targetIdx],
+                                    pvalue: pValue,
+                                    score: score,
+                                    offset: offset,
+                                    overlap: overlap,
+                                    strand: strand,
+                                    alignment: this.generateAlignment(queryMotifs[queryNames[0]], targetMotifs[targetNames[targetIdx]], offset)
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Sort by p-value (ascending) and return top results
+                    matches.sort((a, b) => a.pvalue - b.pvalue);
+                    
+                    return {
+                        matches: matches.slice(0, maxResults)
+                    };
+                    
+                } catch (error) {
+                    console.error('TOMTOM analysis failed:', error);
+                    this.elements.selectionStatus.textContent = `Error: ${error.message}`;
+                    throw error;
+                }
+            }
+            
+            generateAlignment(queryPwm, targetPwm, offset) {
+                // Convert PWM to consensus sequence for alignment visualization
+                const memeSuite = new MemeSuiteLite();
+                const alphabet = ['A', 'C', 'G', 'T'];
+                
+                try {
+                    const querySeq = memeSuite.characters(queryPwm, alphabet, true);
+                    const targetSeq = memeSuite.characters(targetPwm, alphabet, true);
+                    
+                    // Create alignment string with offset
+                    let alignment = '';
+                    const queryLen = querySeq.length;
+                    const targetLen = targetSeq.length;
+                    
+                    for (let i = 0; i < Math.max(queryLen, targetLen + Math.abs(offset)); i++) {
+                        const qIdx = i;
+                        const tIdx = i - offset;
+                        
+                        const qChar = (qIdx >= 0 && qIdx < queryLen) ? querySeq[qIdx] : '-';
+                        const tChar = (tIdx >= 0 && tIdx < targetLen) ? targetSeq[tIdx] : '-';
+                        
+                        alignment += qChar === tChar ? qChar : (qChar + '/' + tChar);
+                    }
+                    
+                    return alignment.substring(0, 20) + (alignment.length > 20 ? '...' : '');
+                    
+                } catch (error) {
+                    console.warn('Alignment generation failed:', error);
+                    return 'N/A';
+                }
+            }
+            
+            displayTomtomResults(results) {
+                this.tomtomResults = results;
+                this.elements.resultsSection.style.display = 'block';
+                
+                if (results.matches && results.matches.length > 0) {
+                    // Create enhanced results display
+                    this.elements.tomtomResults.innerHTML = `
+                        <div class="results-header">
+                            <h4>TOMTOM Results (${results.matches.length} matches found)</h4>
+                            <button class="export-btn" onclick="app.exportTomtomResults()">Export CSV</button>
+                        </div>
+                        <div class="results-table-container">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Target Motif</th>
+                                        <th>P-value</th>
+                                        <th>Score</th>
+                                        <th>Offset</th>
+                                        <th>Overlap</th>
+                                        <th>Strand</th>
+                                        <th>Alignment</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="results-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="motif-detail-panel" class="motif-detail-panel" style="display: none;">
+                            <div class="detail-header">
+                                <h5 id="detail-motif-name">Motif Details</h5>
+                                <button onclick="document.getElementById('motif-detail-panel').style.display='none'">×</button>
+                            </div>
+                            <div class="detail-content">
+                                <div class="logo-comparison">
+                                    <div class="logo-container">
+                                        <h6>Query Motif</h6>
+                                        <div id="query-logo" class="motif-logo"></div>
+                                    </div>
+                                    <div class="logo-container">
+                                        <h6>Target Motif</h6>
+                                        <div id="target-logo" class="motif-logo"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Populate table rows
+                    const tbody = document.getElementById('results-tbody');
+                    results.matches.forEach((match, index) => {
+                        const row = document.createElement('tr');
+                        row.className = 'result-row';
+                        row.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td class="motif-name">${match.name}</td>
+                            <td class="p-value">${match.pvalue.toExponential(2)}</td>
+                            <td class="score">${match.score.toFixed(3)}</td>
+                            <td class="offset">${match.offset}</td>
+                            <td class="overlap">${match.overlap}</td>
+                            <td class="strand ${match.strand === '+' ? 'positive' : 'negative'}">${match.strand}</td>
+                            <td class="alignment">${match.alignment}</td>
+                            <td class="actions">
+                                <button class="detail-btn" onclick="app.showMotifComparison('${match.name}', ${index})">
+                                    View Details
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    this.elements.tomtomResults.innerHTML = `
+                        <div class="no-results">
+                            <div class="no-results-icon">🔍</div>
+                            <h4>No significant matches found</h4>
+                            <p>Try adjusting the p-value threshold or uploading a different database.</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            exportTomtomResults() {
+                if (!this.tomtomResults) return;
+                
+                let csv = 'Motif Name,P-value,Score,Offset,Overlap,Strand,Alignment\n';
+                this.tomtomResults.matches.forEach(match => {
+                    csv += `${match.name},${match.pvalue},${match.score},${match.offset},${match.overlap},${match.strand},"${match.alignment}"\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tomtom_results_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            async showMotifComparison(targetMotifName, matchIndex) {
+                try {
+                    if (!this.uploadedDatabase || !this.tomtomResults) return;
+                    
+                    // Show the detail panel
+                    const detailPanel = document.getElementById('motif-detail-panel');
+                    const detailMotifName = document.getElementById('detail-motif-name');
+                    const queryLogoDiv = document.getElementById('query-logo');
+                    const targetLogoDiv = document.getElementById('target-logo');
+                    
+                    detailMotifName.textContent = `Comparison: Query vs ${targetMotifName}`;
+                    
+                    // Clear previous logos
+                    queryLogoDiv.innerHTML = '';
+                    targetLogoDiv.innerHTML = '';
+                    
+                    // Get the query motif (selected region)
+                    const queryMotifMeme = this.extractSelectedMotif();
+                    const memeSuite = new MemeSuiteLite();
+                    const queryMotifs = memeSuite.readMeme(queryMotifMeme);
+                    const queryMotifName = Object.keys(queryMotifs)[0];
+                    const queryPwm = queryMotifs[queryMotifName];
+                    
+                    // Get the target motif
+                    const targetMotifs = memeSuite.readMeme(this.uploadedDatabase);
+                    const targetPwm = targetMotifs[targetMotifName];
+                    
+                    if (queryPwm && targetPwm) {
+                        // Convert PWMs to LogoJS format and create logos
+                        await Promise.all([
+                            this.createMotifLogo(queryPwm, queryLogoDiv, 'Query Motif'),
+                            this.createMotifLogo(targetPwm, targetLogoDiv, targetMotifName)
+                        ]);
+                    }
+                    
+                    // Show the panel
+                    detailPanel.style.display = 'block';
+                    
+                    // Make panel draggable
+                    this.makePanelDraggable(detailPanel);
+                    
+                } catch (error) {
+                    console.error('Error showing motif comparison:', error);
+                    alert('Error displaying motif comparison: ' + error.message);
+                }
+            }
+            
+            async createMotifLogo(pwm, container, title) {
+                try {
+                    // Convert PWM to the format expected by our logo system
+                    const convertedMatrix = this.convertPwmToMatrix(pwm);
+                    
+                    // Create a div for the logo
+                    const logoDiv = document.createElement('div');
+                    logoDiv.id = 'motif-logo-' + Date.now();
+                    container.appendChild(logoDiv);
+                    
+                    // Get theme-appropriate colors for DNA bases
+                    const themeColors = this.getThemeBasesColors();
+                    
+                    // Use the same logojs API as in the main application
+                    if (typeof logojs !== 'undefined') {
+                        // Create custom DNA alphabet with theme colors
+                        const customAlphabet = [
+                            {regex: 'A', color: themeColors.A, component: logojs.A},
+                            {regex: 'C', color: themeColors.C, component: logojs.C}, 
+                            {regex: 'G', color: themeColors.G, component: logojs.G},
+                            {regex: 'T', color: themeColors.T, component: logojs.T}
+                        ];
+                        
+                        // Calculate optimal logo width based on motif length
+                        const logoWidth = Math.min(convertedMatrix.length * 18 + 60, 300);
+                        const logoConfig = {
+                            ppm: convertedMatrix,
+                            alphabet: customAlphabet,
+                            width: logoWidth,
+                            height: 120,
+                            mode: 'INFORMATION_CONTENT',
+                            style: {
+                                textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
+                                axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
+                            }
+                        };
+                        
+                        if (logojs.embedLogo) {
+                            logojs.embedLogo(logoDiv, logoConfig);
+                        } else if (logojs.embedDNALogo) {
+                            logojs.embedDNALogo(logoDiv, logoConfig);
+                        } else {
+                            throw new Error('LogoJS embedding functions not available');
+                        }
+                    } else {
+                        throw new Error('LogoJS not available');
+                    }
+                } catch (error) {
+                    console.warn('Logo creation failed, using text fallback:', error);
+                    // Fallback: create a simple text representation
+                    const consensus = this.generateConsensusFromPwm(pwm);
+                    container.innerHTML = `<div style="font-family: monospace; font-size: 14px; text-align: center; padding: 20px; background: #f5f5f5; border-radius: 4px; border: 1px solid #ddd;">${consensus}</div>`;
+                }
+            }
+            
+            convertPwmToMatrix(pwm) {
+                // Convert PWM format to our matrix format (positions x bases)
+                const matrixLength = pwm[0] ? pwm[0].length : pwm.length;
+                const convertedMatrix = [];
+                
+                for (let pos = 0; pos < matrixLength; pos++) {
+                    const position = [
+                        pwm[0] ? pwm[0][pos] : pwm[pos][0],  // A
+                        pwm[1] ? pwm[1][pos] : pwm[pos][1],  // C
+                        pwm[2] ? pwm[2][pos] : pwm[pos][2],  // G
+                        pwm[3] ? pwm[3][pos] : pwm[pos][3]   // T
+                    ];
+                    
+                    // Normalize to ensure sum = 1
+                    const total = position.reduce((a, b) => a + Math.max(0, b || 0), 0);
+                    if (total > 0) {
+                        convertedMatrix.push(position.map(val => Math.max(0, val || 0) / total));
+                    } else {
+                        convertedMatrix.push([0.25, 0.25, 0.25, 0.25]);
+                    }
+                }
+                
+                return convertedMatrix;
+            }
+            
+            generateConsensusFromPwm(pwm) {
+                const bases = ['A', 'C', 'G', 'T'];
+                const matrixLength = pwm[0] ? pwm[0].length : pwm.length;
+                let consensus = '';
+                
+                for (let pos = 0; pos < Math.min(matrixLength, 50); pos++) {
+                    const position = [
+                        pwm[0] ? pwm[0][pos] : pwm[pos][0],
+                        pwm[1] ? pwm[1][pos] : pwm[pos][1],
+                        pwm[2] ? pwm[2][pos] : pwm[pos][2],
+                        pwm[3] ? pwm[3][pos] : pwm[pos][3]
+                    ];
+                    
+                    // Find the most probable base
+                    let maxIdx = 0;
+                    let maxVal = position[0] || 0;
+                    for (let i = 1; i < position.length; i++) {
+                        if ((position[i] || 0) > maxVal) {
+                            maxVal = position[i] || 0;
+                            maxIdx = i;
+                        }
+                    }
+                    
+                    consensus += bases[maxIdx];
+                }
+                
+                return consensus + (matrixLength > 50 ? '...' : '');
+            }
+            
+            makePanelDraggable(panel) {
+                let isDragging = false;
+                let dragOffset = { x: 0, y: 0 };
+                
+                // Add drag functionality to the header
+                const header = panel.querySelector('.detail-header');
+                if (!header) return;
+                
+                header.style.cursor = 'move';
+                
+                const startDrag = (e) => {
+                    isDragging = true;
+                    const rect = panel.getBoundingClientRect();
+                    dragOffset.x = e.clientX - rect.left;
+                    dragOffset.y = e.clientY - rect.top;
+                    
+                    document.addEventListener('mousemove', drag);
+                    document.addEventListener('mouseup', stopDrag);
+                    e.preventDefault();
+                };
+                
+                const drag = (e) => {
+                    if (!isDragging) return;
+                    
+                    const newX = e.clientX - dragOffset.x;
+                    const newY = e.clientY - dragOffset.y;
+                    
+                    // Keep panel within viewport bounds
+                    const maxX = window.innerWidth - panel.offsetWidth;
+                    const maxY = window.innerHeight - panel.offsetHeight;
+                    
+                    const boundedX = Math.max(0, Math.min(newX, maxX));
+                    const boundedY = Math.max(0, Math.min(newY, maxY));
+                    
+                    panel.style.left = boundedX + 'px';
+                    panel.style.top = boundedY + 'px';
+                    panel.style.transform = 'none';
+                };
+                
+                const stopDrag = () => {
+                    isDragging = false;
+                    document.removeEventListener('mousemove', drag);
+                    document.removeEventListener('mouseup', stopDrag);
+                };
+                
+                header.addEventListener('mousedown', startDrag);
+            }
+            
+            convertPwmToLogoFormat(pwm) {
+                // Convert our PWM format [4 x length] to LogoJS format
+                const length = pwm[0].length;
+                const logoData = [];
+                
+                for (let pos = 0; pos < length; pos++) {
+                    const position = {};
+                    const bases = ['A', 'C', 'G', 'T'];
+                    
+                    bases.forEach((base, baseIdx) => {
+                        const freq = pwm[baseIdx][pos];
+                        if (freq > 0.01) { // Only include significant frequencies
+                            position[base] = freq;
+                        }
+                    });
+                    
+                    logoData.push(position);
+                }
+                
+                return logoData;
             }
             
             async handleFileLoad(event) {
@@ -1696,7 +3532,7 @@
                     .style('font-size', '10px')
                     .text(d => d);
                 
-                // Add cells with hover tooltips
+                // Add cells with hover tooltips and selection functionality
                 matrix.forEach((position, posIndex) => {
                     position.forEach((value, baseIndex) => {
                         const rect = svg.append('rect')
@@ -1705,7 +3541,9 @@
                             .attr('width', cellSize - 1)
                             .attr('height', cellSize - 1)
                             .style('fill', colorScale(value))
-                            .style('cursor', 'pointer');
+                            .style('cursor', this.selectionMode ? 'crosshair' : 'pointer')
+                            .attr('data-position', posIndex)
+                            .attr('data-base', baseIndex);
                             
                         // Add highlight border if this position is highlighted
                         if (this.highlightedPosition === posIndex) {
@@ -1714,27 +3552,70 @@
                                 .style('stroke-dasharray', '2,2');
                         }
                         
-                        rect.on('mouseover', function(event) {
+                        // Individual cell highlighting removed - only outer rectangle selection is shown
+                        
+                        if (this.selectionMode) {
+                            // Selection mode event handlers
+                            rect.on('mousedown', (event) => {
+                                event.preventDefault();
+                                this.startSelection(posIndex, container);
+                            })
+                            .on('mouseover', (event) => {
+                                if (this.isSelecting) {
+                                    this.updateSelectionEnd(posIndex, container);
+                                }
+                                // Still show tooltip in selection mode
                                 tooltip
                                     .style('opacity', 1)
                                     .html(`Position: ${posIndex + 1}<br/>Base: ${baseLabels[baseIndex]}<br/>${valueLabel}: ${value.toFixed(4)}`)
                                     .style('left', (event.pageX + 10) + 'px')
                                     .style('top', (event.pageY - 10) + 'px');
                             })
-                            .on('mousemove', function(event) {
-                                tooltip
-                                    .style('left', (event.pageX + 10) + 'px')
-                                    .style('top', (event.pageY - 10) + 'px');
-                            })
                             .on('mouseout', function() {
                                 tooltip.style('opacity', 0);
-                            })
-                            .on('click', (event) => {
-                                event.stopPropagation();
-                                this.toggleNucleotideHighlight(posIndex);
                             });
+                        } else {
+                            // Normal mode event handlers
+                            rect.on('mouseover', function(event) {
+                                    tooltip
+                                        .style('opacity', 1)
+                                        .html(`Position: ${posIndex + 1}<br/>Base: ${baseLabels[baseIndex]}<br/>${valueLabel}: ${value.toFixed(4)}`)
+                                        .style('left', (event.pageX + 10) + 'px')
+                                        .style('top', (event.pageY - 10) + 'px');
+                                })
+                                .on('mousemove', function(event) {
+                                    tooltip
+                                        .style('left', (event.pageX + 10) + 'px')
+                                        .style('top', (event.pageY - 10) + 'px');
+                                })
+                                .on('mouseout', function() {
+                                    tooltip.style('opacity', 0);
+                                })
+                                .on('click', (event) => {
+                                    event.stopPropagation();
+                                    this.toggleNucleotideHighlight(posIndex);
+                                });
+                        }
                     });
                 });
+                
+                // Add permanent selection overlay to SVG if there's a selection
+                if (this.selectedRange && this.selectedRange.start !== null && this.selectedRange.end !== null) {
+                    const start = Math.min(this.selectedRange.start, this.selectedRange.end);
+                    const end = Math.max(this.selectedRange.start, this.selectedRange.end);
+                    
+                    svg.append('rect')
+                        .attr('class', 'selection-overlay-permanent')
+                        .attr('x', 30 + start * cellSize)
+                        .attr('y', 15)
+                        .attr('width', (end - start + 1) * cellSize)
+                        .attr('height', 4 * cellSize)
+                        .style('fill', 'rgba(251, 146, 60, 0.15)')
+                        .style('stroke', '#fb923c')
+                        .style('stroke-width', '2px')
+                        .style('stroke-dasharray', '3,3')
+                        .style('pointer-events', 'none');
+                }
                 
                 // Create color legend
                 if (legendContainer) {
@@ -1844,6 +3725,9 @@
                     console.error('Error creating logo:', error);
                     container.innerHTML = this.createFallbackLogo(matrix);
                 }
+                
+                // Add selection overlay for logo mode
+                this.addLogoSelectionOverlay(container, matrix);
             }
             
             getThemeBasesColors() {
@@ -1855,6 +3739,110 @@
                     G: style.getPropertyValue('--base-g-color').trim(),
                     T: style.getPropertyValue('--base-t-color').trim()
                 };
+            }
+            
+            addLogoSelectionOverlay(container, matrix) {
+                // Always add overlay if selection mode is active OR there's an existing selection OR highlighting is needed
+                if (!this.selectionMode && !this.selectedRange && this.highlightedPosition === null) return;
+                
+                // Create invisible overlay for position-based selection
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    z-index: 5;
+                    cursor: ${this.selectionMode ? 'crosshair' : 'pointer'};
+                `;
+                
+                container.style.position = 'relative';
+                
+                // Calculate precise position mapping by examining the actual logo SVG
+                const logoDiv = container.querySelector('div[id^="dna-logo-"]');
+                let positionWidth = 20; // Default fallback
+                let leftOffset = 50;    // Default fallback
+                
+                if (logoDiv && logoDiv.firstChild && logoDiv.firstChild.tagName === 'svg') {
+                    const svg = logoDiv.firstChild;
+                    const svgWidth = parseFloat(svg.getAttribute('width')) || (matrix.length * 20 + 100);
+                    const matrixLength = matrix.length;
+                    
+                    // Calculate actual position width and offset based on SVG dimensions
+                    // LogoJS typically uses some padding and spacing
+                    const availableWidth = svgWidth - 100; // Subtract typical padding
+                    positionWidth = availableWidth / matrixLength;
+                    leftOffset = 50; // Standard logojs left padding
+                }
+                
+                container.appendChild(overlay);
+                const matrixLength = matrix.length;
+                
+                // Add invisible position zones
+                for (let posIndex = 0; posIndex < matrixLength; posIndex++) {
+                    const positionZone = document.createElement('div');
+                    positionZone.style.cssText = `
+                        position: absolute;
+                        left: ${leftOffset + posIndex * positionWidth}px;
+                        top: 0;
+                        width: ${positionWidth}px;
+                        height: 100%;
+                        z-index: 6;
+                    `;
+                    
+                    positionZone.setAttribute('data-position', posIndex);
+                    
+                    // Add highlight if this position is selected
+                    if (this.highlightedPosition === posIndex) {
+                        positionZone.style.background = 'rgba(0, 212, 255, 0.3)';
+                    }
+                    
+                    if (this.selectionMode) {
+                        // Selection mode event handlers
+                        positionZone.addEventListener('mousedown', (event) => {
+                            event.preventDefault();
+                            this.startLogoSelection(posIndex, container, leftOffset, positionWidth);
+                        });
+                        
+                        positionZone.addEventListener('mouseover', (event) => {
+                            if (this.isSelecting) {
+                                this.updateLogoSelectionEnd(posIndex, container, leftOffset, positionWidth);
+                            }
+                        });
+                    } else {
+                        // Normal mode - position highlighting
+                        positionZone.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            this.toggleNucleotideHighlight(posIndex);
+                        });
+                    }
+                    
+                    overlay.appendChild(positionZone);
+                }
+                
+                // Add permanent selection overlay if there's a selection
+                if (this.selectedRange && this.selectedRange.start !== null && this.selectedRange.end !== null) {
+                    const start = Math.min(this.selectedRange.start, this.selectedRange.end);
+                    const end = Math.max(this.selectedRange.start, this.selectedRange.end);
+                    
+                    const selectionOverlay = document.createElement('div');
+                    selectionOverlay.className = 'logo-permanent-selection';
+                    selectionOverlay.style.cssText = `
+                        position: absolute;
+                        left: ${leftOffset + start * positionWidth}px;
+                        top: 20px;
+                        width: ${(end - start + 1) * positionWidth}px;
+                        height: calc(100% - 40px);
+                        background: rgba(251, 146, 60, 0.15);
+                        border: 2px dashed #fb923c;
+                        border-radius: 4px;
+                        pointer-events: none;
+                        z-index: 4;
+                    `;
+                    
+                    container.appendChild(selectionOverlay);
+                }
             }
             
             createFallbackLogo(scoreMatrix) {
@@ -2408,8 +4396,9 @@
         }
         
         // Initialize the visualizer when the page loads
+        let app; // Global reference for inline event handlers
         document.addEventListener('DOMContentLoaded', () => {
-            new DNADiffusionVisualizer();
+            app = new DNADiffusionVisualizer();
         });
     </script>
 </body>
