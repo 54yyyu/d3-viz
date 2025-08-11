@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JASPAR MEME Motif Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .motifs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .motif {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .motif-header {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .motif-info {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .logo-container {
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .file-input {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            text-align: center;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .sample-data {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JASPAR MEME Motif Visualization</h1>
+        
+        <div class="file-input">
+            <p>Upload a MEME format file:</p>
+            <input type="file" id="fileInput" accept=".txt,.meme" />
+        </div>
+        
+        <div id="motifs-container" class="motifs-grid"></div>
+        
+        <div class="sample-data">
+            <h3>Sample Data Format:</h3>
+            <pre>MEME version 4
+
+ALPHABET= ACGT
+
+MOTIF MA0004.1 Arnt
+letter-probability matrix: alength= 4 w= 6 nsites= 20 E= 0
+ 0.200000  0.800000  0.000000  0.000000
+ 0.950000  0.000000  0.050000  0.000000
+...</pre>
+        </div>
+    </div>
+
+    <script src="bundle.js"></script>
+    <script>
+        class MEMEParser {
+            constructor() {
+                this.motifs = [];
+            }
+
+            parseMEME(content) {
+                const lines = content.split('\n');
+                let currentMotif = null;
+                let inMatrix = false;
+                let matrixData = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    
+                    if (line.startsWith('MOTIF ')) {
+                        // Save previous motif if exists
+                        if (currentMotif && matrixData.length > 0) {
+                            currentMotif.matrix = matrixData;
+                            this.motifs.push(currentMotif);
+                        }
+                        
+                        // Start new motif
+                        const parts = line.split(' ');
+                        currentMotif = {
+                            id: parts[1] || 'Unknown',
+                            name: parts.slice(2).join(' ') || 'Unnamed',
+                            matrix: [],
+                            info: {}
+                        };
+                        matrixData = [];
+                        inMatrix = false;
+                    }
+                    
+                    else if (line.startsWith('letter-probability matrix:')) {
+                        inMatrix = true;
+                        // Parse matrix info
+                        const info = line.match(/alength=\s*(\d+)\s+w=\s*(\d+)\s+nsites=\s*(\d+)/);
+                        if (info && currentMotif) {
+                            currentMotif.info.alength = parseInt(info[1]);
+                            currentMotif.info.width = parseInt(info[2]);
+                            currentMotif.info.nsites = parseInt(info[3]);
+                        }
+                    }
+                    
+                    else if (inMatrix && line.match(/^\s*[\d.]+/)) {
+                        // Parse matrix row
+                        const values = line.trim().split(/\s+/).map(parseFloat);
+                        if (values.length >= 4) {
+                            matrixData.push(values.slice(0, 4)); // A, C, G, T
+                        }
+                    }
+                    
+                    else if (line.startsWith('URL ') && currentMotif) {
+                        currentMotif.url = line.substring(4);
+                    }
+                }
+                
+                // Don't forget the last motif
+                if (currentMotif && matrixData.length > 0) {
+                    currentMotif.matrix = matrixData;
+                    this.motifs.push(currentMotif);
+                }
+                
+                return this.motifs;
+            }
+        }
+
+        function visualizeMotifs(motifs) {
+            const container = document.getElementById('motifs-container');
+            container.innerHTML = '';
+            
+            if (motifs.length === 0) {
+                container.innerHTML = '<p class="error">No motifs found in the file.</p>';
+                return;
+            }
+            
+            motifs.forEach((motif, index) => {
+                try {
+                    const motifDiv = document.createElement('div');
+                    motifDiv.className = 'motif';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'motif-header';
+                    header.textContent = `${motif.id} - ${motif.name}`;
+                    
+                    const info = document.createElement('div');
+                    info.className = 'motif-info';
+                    info.innerHTML = `
+                        Width: ${motif.info.width || motif.matrix.length} | 
+                        Sites: ${motif.info.nsites || 'Unknown'} | 
+                        Alphabet Length: ${motif.info.alength || 4}
+                        ${motif.url ? `<br><a href="${motif.url}" target="_blank">${motif.url}</a>` : ''}
+                    `;
+                    
+                    const logoContainer = document.createElement('div');
+                    logoContainer.className = 'logo-container';
+                    logoContainer.id = `logo-${index}`;
+                    
+                    motifDiv.appendChild(header);
+                    motifDiv.appendChild(info);
+                    motifDiv.appendChild(logoContainer);
+                    container.appendChild(motifDiv);
+                    
+                    // Matrix is already in PPM format (probabilities that sum to 1.0)
+                    const ppm = motif.matrix.map(row => [...row]); // A, C, G, T order
+                    
+                    // Create logo using logojs
+                    if (window.logojs && window.logojs.embedDNALogo) {
+                        try {
+                            // Use logojs to render the DNA logo
+                            logojs.embedDNALogo(logoContainer, {
+                                ppm: ppm,
+                                height: 100,
+                                width: Math.max(200, ppm.length * 30)
+                            });
+                        } catch (error) {
+                            console.error('Error creating logo:', error);
+                            logoContainer.innerHTML = `<p class="error">Error creating logo: ${error.message}</p>`;
+                        }
+                    } else {
+                        logoContainer.innerHTML = '<p class="error">LogoJS library not loaded properly.</p>';
+                        console.log('logojs object:', window.logojs);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error visualizing motif:', error);
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error';
+                    errorDiv.textContent = `Error visualizing motif ${motif.id}: ${error.message}`;
+                    container.appendChild(errorDiv);
+                }
+            });
+        }
+
+        function loadSampleData() {
+            const sampleData = `MEME version 4
+
+ALPHABET= ACGT
+
+strands: + -
+
+Background letter frequencies
+A 0.25 C 0.25 G 0.25 T 0.25
+
+MOTIF MA0004.1 Arnt
+letter-probability matrix: alength= 4 w= 6 nsites= 20 E= 0
+ 0.200000  0.800000  0.000000  0.000000
+ 0.950000  0.000000  0.050000  0.000000
+ 0.000000  1.000000  0.000000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  0.000000  1.000000  0.000000
+URL http://jaspar.genereg.net/matrix/MA0004.1
+
+MOTIF MA0069.1 PAX6
+letter-probability matrix: alength= 4 w= 14 nsites= 43 E= 0
+ 0.046512  0.093023  0.093023  0.767442
+ 0.046512  0.046512  0.000000  0.906977
+ 0.093023  0.604651  0.023256  0.279070
+ 0.906977  0.046512  0.023256  0.023256
+ 0.069767  0.790698  0.023256  0.116279
+ 0.023256  0.000000  0.953488  0.023256
+ 0.023256  0.860465  0.093023  0.023256
+ 0.488372  0.046512  0.046512  0.418605
+ 0.023256  0.093023  0.023256  0.860465
+ 0.046512  0.325581  0.581395  0.046512
+ 0.837209  0.000000  0.139535  0.023256
+ 0.255814  0.255814  0.302326  0.186047
+ 0.023256  0.116279  0.069767  0.790698
+ 0.023256  0.000000  0.395349  0.581395
+URL http://jaspar.genereg.net/matrix/MA0069.1
+
+MOTIF MA0071.1 RORA
+letter-probability matrix: alength= 4 w= 10 nsites= 25 E= 0
+ 0.600000  0.040000  0.080000  0.280000
+ 0.360000  0.040000  0.000000  0.600000
+ 0.240000  0.480000  0.160000  0.120000
+ 0.440000  0.080000  0.200000  0.280000
+ 0.840000  0.000000  0.160000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  1.000000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+URL http://jaspar.genereg.net/matrix/MA0071.1`;
+
+            const parser = new MEMEParser();
+            const motifs = parser.parseMEME(sampleData);
+            visualizeMotifs(motifs);
+        }
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const parser = new MEMEParser();
+                    const motifs = parser.parseMEME(e.target.result);
+                    visualizeMotifs(motifs);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Load sample data on page load
+        window.addEventListener('load', function() {
+            loadSampleData();
+        });
+    </script>
+</body>
+</html>
