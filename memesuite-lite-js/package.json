@@ -1,0 +1,39 @@
+{
+  "name": "memesuite-lite-js",
+  "version": "1.0.0",
+  "description": "JavaScript implementation of MEME suite algorithms for biological sequence analysis",
+  "main": "memesuite-lite.js",
+  "scripts": {
+    "test": "node test.js",
+    "example": "node example.js"
+  },
+  "keywords": [
+    "bioinformatics",
+    "genomics",
+    "motif",
+    "fimo",
+    "tomtom",
+    "dna",
+    "sequence-analysis",
+    "pwm",
+    "meme-suite"
+  ],
+  "author": "JavaScript port of memesuite-lite",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/memesuite-lite-js"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/memesuite-lite-js/issues"
+  },
+  "homepage": "https://github.com/yourusername/memesuite-lite-js#readme",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "files": [
+    "memesuite-lite.js",
+    "README.md",
+    "example.js"
+  ]
+}
