@@ -3794,8 +3794,8 @@
             }
             
             addLogoSelectionOverlay(container, matrix) {
-                // Always add overlay if selection mode is active OR there's an existing selection OR highlighting is needed
-                if (!this.selectionMode && !this.selectedRange && this.highlightedPosition === null) return;
+                // Always add overlay for logo mode to enable selection functionality
+                // (Remove the early return that was preventing overlay creation in logo mode)
                 
                 // Create invisible overlay for position-based selection
                 const overlay = document.createElement('div');
