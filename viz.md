@@ -25,6 +25,9 @@ Visualization Data Format Documentation
   │   ├── split: "test" (evaluation only)
   │   ├── save_oracle_mse: true/false
   │   ├── original_samples: (batch_size, seq_length) [evaluation only]
+  │   ├── ground_truth_labels: (batch_size, num_labels) [evaluation only]
+  │   ├── ground_truth_predictions: (batch_size, num_labels) [evaluation only]
+  │   ├── dataset_indices: (batch_size,)
   │   └── noise_schedule/
   │       ├── type: "geometric"
   │       ├── sigma_min: 0.001
@@ -38,7 +41,8 @@ Visualization Data Format Documentation
       │   ├── sequence: (batch_size, seq_length)
       │   ├── score_matrix: (batch_size, seq_length, 4)
       │   ├── prob_matrix: (batch_size, seq_length, 4)
-      │   └── oracle_mse: (batch_size,) [evaluation only]
+      │   ├── oracle_mse: (batch_size,) [evaluation only]
+      │   └── oracle_predictions: (batch_size, num_labels) [evaluation only]
       ├── step_0001/
       │   └── ...
       └── step_0248/
@@ -55,7 +59,8 @@ Visualization Data Format Documentation
   | prob_matrix  | (batch_size, seq_length, 4) | float16/32 | Probability matrix from staggered score computation |
   | noise_level  | scalar                      | float32    | Current noise level (σ)                            |
   | noise_rate   | scalar                      | float32    | Rate of noise change (dσ/dt)                       |
-  | oracle_mse   | (batch_size,)               | float32    | Oracle MSE predictions [evaluation only]           |
+  | oracle_mse        | (batch_size,)               | float32    | Oracle MSE vs ground truth [evaluation only]      |
+  | oracle_predictions| (batch_size, num_labels)   | float32    | Oracle predictions at current step [evaluation only]|
 
   Metadata
 
@@ -69,6 +74,9 @@ Visualization Data Format Documentation
   | split            | string                   | Dataset split for evaluation ("train", "val", "test") |
   | save_oracle_mse  | bool                     | Whether oracle MSE data is included                   |
   | original_samples | (batch_size, seq_length) | Original test samples for MSE comparison [evaluation only] |
+  | ground_truth_labels    | (batch_size, num_labels) | Ground truth target labels [evaluation only]         |
+  | ground_truth_predictions| (batch_size, num_labels)| Oracle predictions on ground truth data [evaluation only]|
+  | dataset_indices        | (batch_size,)            | Dataset indices used for sample selection            |
 
   Loading Data
 
@@ -91,13 +99,21 @@ Visualization Data Format Documentation
       probs = np.array(step_0['prob_matrix'])       # (batch_size, seq_length, 4)
       noise_level = step_0.attrs['noise_level']    # scalar
 
-      # Oracle MSE (if available)
+      # Oracle data (if available)
       if 'oracle_mse' in step_0:
           oracle_mse = np.array(step_0['oracle_mse'])  # (batch_size,)
+      if 'oracle_predictions' in step_0:
+          oracle_predictions = np.array(step_0['oracle_predictions'])  # (batch_size, num_labels)
       
-      # Original samples (if available, stored in metadata)
+      # Ground truth data (if available, stored in metadata)
       if 'original_samples' in f['metadata']:
           original_samples = np.array(f['metadata']['original_samples'])  # (batch_size, seq_length)
+      if 'ground_truth_labels' in f['metadata']:
+          gt_labels = np.array(f['metadata']['ground_truth_labels'])  # (batch_size, num_labels)
+      if 'ground_truth_predictions' in f['metadata']:
+          gt_predictions = np.array(f['metadata']['ground_truth_predictions'])  # (batch_size, num_labels)
+      if 'dataset_indices' in f['metadata']:
+          dataset_indices = np.array(f['metadata']['dataset_indices'])  # (batch_size,)
 
   Python (NPZ)
 
@@ -118,13 +134,32 @@ Visualization Data Format Documentation
   noise_levels = data['noise_levels']      # (steps,)
   timesteps = data['timesteps']            # (steps,)
 
-  # Oracle MSE (if available)
+  # Oracle data (if available)
   if 'oracle_mses' in data:
       oracle_mses = data['oracle_mses']    # (steps, batch_size)
+  if 'oracle_predictions' in data:
+      oracle_predictions = data['oracle_predictions']  # (steps, batch_size, num_labels)
   
-  # Original samples (if available)
+  # Ground truth data (if available)
   if 'original_samples' in data:
       original_samples = data['original_samples']  # (batch_size, seq_length)
+  if 'ground_truth_labels' in data:
+      gt_labels = data['ground_truth_labels']  # (batch_size, num_labels)
+  if 'ground_truth_predictions' in data:
+      gt_predictions = data['ground_truth_predictions']  # (batch_size, num_labels)
+  if 'dataset_indices' in data:
+      dataset_indices = data['dataset_indices']  # (batch_size,)
+
+  Dataset Index Selection
+
+  Sample Selection Options
+
+  - **Random sampling**: `--max_samples 100` (default behavior)
+  - **Specific indices**: `--specific_indices "11,12,40"` (guarantees these samples)
+  - **Hybrid selection**: Both arguments together for guaranteed samples + random fill
+
+  The `dataset_indices` metadata tracks which samples were actually selected, ensuring
+  reproducibility and enabling targeted analysis of specific sequences.
 
   Sampling vs Evaluation Data
 
@@ -137,6 +172,8 @@ Visualization Data Format Documentation
   Evaluation Mode
 
   - Oracle MSE: Included (save_oracle_mse: true)
+  - Ground truth data: Included (labels, predictions, original samples)
+  - Oracle predictions: Included at each step for trend analysis
   - Split: Specified (typically "test")
   - Use case: Analyzing generation quality and comparing to ground truth
 
@@ -171,4 +208,14 @@ Visualization Data Format Documentation
       --data_path model_zoo/deepstarr/DeepSTARR_data.h5 \
       --save_viz_data \
       --viz_output my_evaluation_viz.h5 \
-      --max_samples 500
+      --max_samples 500 \
+      --specific_indices "11,12,40"  # Optional: guarantee specific samples
+
+  # Select specific samples with random fill
+  python model_zoo/lentimpra/evaluate.py \
+      --checkpoint path/to/checkpoint.ckpt \
+      --oracle_checkpoint path/to/oracle.ckpt \
+      --data_path path/to/lentimpra_data.h5 \
+      --save_viz_data \
+      --max_samples 100 \
+      --specific_indices "5,15,25,35"  # These 4 guaranteed + 96 random

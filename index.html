@@ -1472,6 +1472,8 @@
                             <canvas id="rateChart"></canvas>
                         </div>
                     </div>
+                    
+                    <!-- Prediction plot sections will be dynamically inserted after this point -->
                 </div>
             </div>
             
@@ -1692,7 +1694,9 @@
                     runTomtom: document.getElementById('runTomtom'),
                     resultsSection: document.getElementById('resultsSection'),
                     tomtomResults: document.getElementById('tomtomResults'),
-                    exportResults: document.getElementById('exportResults')
+                    exportResults: document.getElementById('exportResults'),
+                    // Prediction plots elements
+                    visualizationGrid: document.querySelector('.visualization-grid')
                 };
             }
             
@@ -1916,23 +1920,54 @@
                 
                 const colors = chartColors[this.theme];
                 
-                Object.values(this.charts).forEach(chart => {
-                    if (chart.options?.scales) {
-                        if (chart.options.scales.x?.grid) {
-                            chart.options.scales.x.grid.color = colors.gridColor;
-                        }
-                        if (chart.options.scales.x?.ticks) {
-                            chart.options.scales.x.ticks.color = colors.textColor;
-                        }
-                        if (chart.options.scales.y?.grid) {
-                            chart.options.scales.y.grid.color = colors.gridColor;
-                        }
-                        if (chart.options.scales.y?.ticks) {
-                            chart.options.scales.y.ticks.color = colors.textColor;
-                        }
-                        chart.update('none');
+                // Update main charts (excluding predictions object)
+                Object.entries(this.charts).forEach(([key, chart]) => {
+                    if (key === 'predictions' || !chart.options?.scales) return;
+                    
+                    if (chart.options.scales.x?.grid) {
+                        chart.options.scales.x.grid.color = colors.gridColor;
                     }
+                    if (chart.options.scales.x?.ticks) {
+                        chart.options.scales.x.ticks.color = colors.textColor;
+                    }
+                    if (chart.options.scales.y?.grid) {
+                        chart.options.scales.y.grid.color = colors.gridColor;
+                    }
+                    if (chart.options.scales.y?.ticks) {
+                        chart.options.scales.y.ticks.color = colors.textColor;
+                    }
+                    chart.update('none');
                 });
+                
+                // Update prediction charts
+                if (this.charts.predictions) {
+                    Object.values(this.charts.predictions).forEach(chart => {
+                        if (chart.options?.scales) {
+                            if (chart.options.scales.x?.grid) {
+                                chart.options.scales.x.grid.color = colors.gridColor;
+                            }
+                            if (chart.options.scales.x?.ticks) {
+                                chart.options.scales.x.ticks.color = colors.textColor;
+                            }
+                            if (chart.options.scales.x?.title) {
+                                chart.options.scales.x.title.color = colors.textColor;
+                            }
+                            if (chart.options.scales.y?.grid) {
+                                chart.options.scales.y.grid.color = colors.gridColor;
+                            }
+                            if (chart.options.scales.y?.ticks) {
+                                chart.options.scales.y.ticks.color = colors.textColor;
+                            }
+                            if (chart.options.scales.y?.title) {
+                                chart.options.scales.y.title.color = colors.textColor;
+                            }
+                            if (chart.options.plugins?.legend?.labels) {
+                                chart.options.plugins.legend.labels.color = colors.textColor;
+                            }
+                            chart.update('none');
+                        }
+                    });
+                }
             }
             
             // =====================================================
@@ -3127,6 +3162,16 @@
                     this.elements.originalSequenceSection.style.display = 'none';
                 }
                 
+                // Set up prediction plots sections based on data availability
+                if (this.data.metadata.ground_truth_labels && 
+                    this.data.steps && this.data.steps.length > 0 && 
+                    this.data.steps[0].oracle_predictions) {
+                    this.setupPredictionPlots();
+                } else {
+                    // Clear any existing prediction plots
+                    this.clearPredictionPlots();
+                }
+                
                 this.updateDatasetInfo();
                 this.createSampleList();
                 this.setupSlider();
@@ -3150,7 +3195,14 @@
                 for (let i = 0; i < this.data.metadata.num_samples; i++) {
                     const item = document.createElement('div');
                     item.className = 'sample-item';
-                    item.textContent = `Sample ${i + 1}`;
+                    
+                    // Create sample text with dataset index if available
+                    let sampleText = `Sample ${i + 1}`;
+                    if (this.data.metadata.dataset_indices && this.data.metadata.dataset_indices[i] !== undefined) {
+                        sampleText += ` (Index: ${this.data.metadata.dataset_indices[i]})`;
+                    }
+                    
+                    item.textContent = sampleText;
                     item.addEventListener('click', () => this.selectSample(i));
                     this.elements.sampleList.appendChild(item);
                 }
@@ -4036,33 +4088,62 @@
                     }
                 });
                 
-                // MSE Chart
-                this.charts.mse = new Chart(document.getElementById('mseChart'), {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: getChartOptions()
-                });
+                // Initialize charts with error handling
+                try {
+                    // MSE Chart
+                    const mseElement = document.getElementById('mseChart');
+                    if (mseElement) {
+                        this.charts.mse = new Chart(mseElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize MSE chart:', error);
+                }
                 
-                // Noise Level Chart
-                this.charts.noise = new Chart(document.getElementById('noiseChart'), {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: getChartOptions()
-                });
+                try {
+                    // Noise Level Chart
+                    const noiseElement = document.getElementById('noiseChart');
+                    if (noiseElement) {
+                        this.charts.noise = new Chart(noiseElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize noise chart:', error);
+                }
                 
-                // Noise Rate Chart
-                this.charts.rate = new Chart(document.getElementById('rateChart'), {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: getChartOptions()
-                });
+                try {
+                    // Noise Rate Chart
+                    const rateElement = document.getElementById('rateChart');
+                    if (rateElement) {
+                        this.charts.rate = new Chart(rateElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize rate chart:', error);
+                }
                 
-                // Nucleotide Changes Chart
-                this.charts.changes = new Chart(document.getElementById('changesChart'), {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: getChartOptions()
-                });
+                try {
+                    // Nucleotide Changes Chart
+                    const changesElement = document.getElementById('changesChart');
+                    if (changesElement) {
+                        this.charts.changes = new Chart(changesElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize changes chart:', error);
+                }
             }
             
             calculateNucleotideChanges(sampleIndex) {
@@ -4164,70 +4245,93 @@
                 const changesData = this.calculateNucleotideChanges(this.currentSample);
                 
                 // Update MSE chart
-                this.charts.mse.data = {
-                    labels: steps,
-                    datasets: [{
-                        data: mseData,
-                        borderColor: '#00d4ff',
-                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                };
+                if (this.charts.mse) {
+                    this.charts.mse.data = {
+                        labels: steps,
+                        datasets: [{
+                            data: mseData,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    };
+                }
                 
                 // Update Noise Level chart
-                this.charts.noise.data = {
-                    labels: steps,
-                    datasets: [{
-                        data: noiseData,
-                        borderColor: '#ff6b6b',
-                        backgroundColor: 'rgba(255, 107, 107, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                };
+                if (this.charts.noise) {
+                    this.charts.noise.data = {
+                        labels: steps,
+                        datasets: [{
+                            data: noiseData,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    };
+                }
                 
                 // Update Score Change chart
-                this.charts.rate.data = {
-                    labels: steps,
-                    datasets: [{
-                        data: scoreChangeData,
-                        borderColor: '#96ceb4',
-                        backgroundColor: 'rgba(150, 206, 180, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                };
+                if (this.charts.rate) {
+                    this.charts.rate.data = {
+                        labels: steps,
+                        datasets: [{
+                            data: scoreChangeData,
+                            borderColor: '#96ceb4',
+                            backgroundColor: 'rgba(150, 206, 180, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    };
+                }
                 
                 // Update Nucleotide Changes chart
-                this.charts.changes.data = {
-                    labels: steps,
-                    datasets: [{
-                        data: changesData,
-                        borderColor: '#4ecdc4',
-                        backgroundColor: 'rgba(78, 205, 196, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }]
-                };
+                if (this.charts.changes) {
+                    this.charts.changes.data = {
+                        labels: steps,
+                        datasets: [{
+                            data: changesData,
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    };
+                }
                 
-                // Update all charts
-                Object.values(this.charts).forEach(chart => chart.update('none'));
+                // Update all charts (excluding predictions object)
+                if (this.charts) {
+                    Object.entries(this.charts).forEach(([key, chart]) => {
+                        if (key === 'predictions' || !chart || !chart.update || typeof chart.update !== 'function') return;
+                        chart.update('none');
+                    });
+                }
                 
                 this.updateChartProgress();
+                
+                // Update prediction charts if they exist
+                if (this.charts.predictions) {
+                    this.updatePredictionCharts();
+                }
             }
             
             updateChartProgress() {
-                // Add current step indicator to charts
-                Object.values(this.charts).forEach(chart => {
+                // Add current step indicator to charts (excluding predictions object)
+                if (!this.charts) return;
+                
+                Object.entries(this.charts).forEach(([key, chart]) => {
+                    // Skip the predictions object as it's not a chart itself
+                    if (key === 'predictions' || !chart || !chart.data || !chart.data.datasets || !Array.isArray(chart.data.datasets)) return;
+                    
                     // Remove existing progress line
                     if (chart.data.datasets[1]) {
                         chart.data.datasets.pop();
@@ -4238,21 +4342,272 @@
                         ? { border: '#ffffff', background: '#ffffff' }
                         : { border: '#212529', background: '#ffffff' };
                     
-                    // Add progress line
-                    chart.data.datasets.push({
-                        type: 'scatter',
-                        data: [{
-                            x: this.currentStep,
-                            y: chart.data.datasets[0].data[this.currentStep]
-                        }],
-                        borderColor: progressColors.border,
-                        backgroundColor: progressColors.background,
-                        borderWidth: 2,
-                        pointRadius: 6,
-                        pointHoverRadius: 8,
-                        showLine: false,
-                        order: -1 // Render this dataset on top of others
+                    // Add progress line if we have data for the current step
+                    if (chart.data.datasets[0] && chart.data.datasets[0].data[this.currentStep] !== undefined) {
+                        chart.data.datasets.push({
+                            type: 'scatter',
+                            data: [{
+                                x: this.currentStep,
+                                y: chart.data.datasets[0].data[this.currentStep]
+                            }],
+                            borderColor: progressColors.border,
+                            backgroundColor: progressColors.background,
+                            borderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            showLine: false,
+                            order: -1 // Render this dataset on top of others
+                        });
+                    }
+                    
+                    chart.update('none');
+                });
+                
+                // Update prediction chart progress if they exist
+                if (this.charts.predictions) {
+                    this.updatePredictionChartProgress();
+                }
+            }
+            
+            clearPredictionPlots() {
+                // Remove any existing prediction plot sections from the grid
+                if (this.elements.visualizationGrid) {
+                    const existingPredictionSections = this.elements.visualizationGrid.querySelectorAll('[id^="predictionPlot"][id$="Section"]');
+                    existingPredictionSections.forEach(section => section.remove());
+                }
+                
+                // Clear prediction charts object
+                if (this.charts.predictions) {
+                    Object.values(this.charts.predictions).forEach(chart => {
+                        if (chart && chart.destroy) {
+                            chart.destroy();
+                        }
                     });
+                    this.charts.predictions = {};
+                }
+            }
+            
+            setupPredictionPlots() {
+                if (!this.data || !this.data.metadata || !this.data.metadata.ground_truth_labels || 
+                    !this.data.steps || this.data.steps.length === 0 || !this.data.steps[0].oracle_predictions) return;
+                
+                // Clear any existing prediction plots first
+                this.clearPredictionPlots();
+                
+                const numLabels = this.data.metadata.ground_truth_labels[0].length;
+                
+                // Initialize prediction charts object
+                if (!this.charts.predictions) {
+                    this.charts.predictions = {};
+                }
+                
+                // Create a separate viz-section for each label and append to the grid
+                for (let labelIndex = 0; labelIndex < numLabels; labelIndex++) {
+                    // Create the viz-section element
+                    const vizSection = document.createElement('div');
+                    vizSection.className = 'viz-section';
+                    vizSection.id = `predictionPlot${labelIndex}Section`;
+                    
+                    // Create the title
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'viz-title';
+                    titleDiv.textContent = `Label ${labelIndex + 1} Predictions vs Steps`;
+                    
+                    // Create the chart container
+                    const chartContainer = document.createElement('div');
+                    chartContainer.className = 'chart-container';
+                    
+                    // Create the canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.id = `predictionChart${labelIndex}`;
+                    
+                    // Assemble the structure
+                    chartContainer.appendChild(canvas);
+                    vizSection.appendChild(titleDiv);
+                    vizSection.appendChild(chartContainer);
+                    
+                    // Append directly to the visualization grid (not a separate container)
+                    this.elements.visualizationGrid.appendChild(vizSection);
+                    
+                    // Create chart with error handling
+                    try {
+                        this.charts.predictions[labelIndex] = new Chart(canvas, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: this.getPredictionChartOptions()
+                        });
+                    } catch (error) {
+                        console.warn(`Failed to initialize prediction chart ${labelIndex}:`, error);
+                    }
+                }
+                
+                // Update prediction charts with initial data
+                this.updatePredictionCharts();
+            }
+            
+            getPredictionChartOptions() {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            grid: { color: this.theme === 'dark' ? '#333' : '#dee2e6' },
+                            ticks: { color: this.theme === 'dark' ? '#888' : '#6c757d' },
+                            title: { display: true, text: 'Steps', color: this.theme === 'dark' ? '#888' : '#6c757d' }
+                        },
+                        y: { 
+                            grid: { color: this.theme === 'dark' ? '#333' : '#dee2e6' },
+                            ticks: { color: this.theme === 'dark' ? '#888' : '#6c757d' },
+                            title: { display: true, text: 'Prediction Value', color: this.theme === 'dark' ? '#888' : '#6c757d' }
+                        }
+                    },
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: this.theme === 'dark' ? '#888' : '#6c757d',
+                                usePointStyle: true,
+                                pointStyle: 'rect',
+                                boxWidth: 8,
+                                boxHeight: 8,
+                                padding: 15,
+                                filter: function(legendItem) {
+                                    // Hide "Current Step" from legend
+                                    return legendItem.text !== 'Current Step';
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    onClick: (event, elements, chart) => {
+                        if (elements.length > 0) {
+                            const dataIndex = elements[0].index;
+                            if (dataIndex !== undefined && dataIndex >= 0) {
+                                this.setStep(dataIndex);
+                            }
+                        }
+                    },
+                    onHover: (event, elements, chart) => {
+                        chart.canvas.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
+                };
+            }
+            
+            updatePredictionCharts() {
+                if (!this.data || !this.data.metadata || !this.data.metadata.ground_truth_labels || 
+                    !this.data.steps || this.data.steps.length === 0 || !this.data.steps[0].oracle_predictions || 
+                    !this.charts.predictions) return;
+                
+                const steps = this.data.steps.map(step => step.step);
+                const numLabels = this.data.metadata.ground_truth_labels[0].length;
+                
+                for (let labelIndex = 0; labelIndex < numLabels; labelIndex++) {
+                    const chart = this.charts.predictions[labelIndex];
+                    if (!chart) continue;
+                    
+                    // Get ground truth values for this label (constant across all samples at current sample)
+                    const groundTruthLabel = this.data.metadata.ground_truth_labels[this.currentSample][labelIndex];
+                    const groundTruthPrediction = this.data.metadata.ground_truth_predictions 
+                        ? this.data.metadata.ground_truth_predictions[this.currentSample][labelIndex] 
+                        : groundTruthLabel;
+                    
+                    // Get oracle predictions for this label across all steps
+                    const oraclePredictions = this.data.steps.map(step => 
+                        step.oracle_predictions[this.currentSample][labelIndex]
+                    );
+                    
+                    // Create datasets
+                    const datasets = [
+                        // Oracle predictions (changing over steps)
+                        {
+                            label: 'Oracle Predictions',
+                            data: oraclePredictions,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 1,
+                            pointHoverRadius: 4,
+                            borderWidth: 2
+                        },
+                        // Ground truth predictions (horizontal dotted line)
+                        {
+                            label: 'Ground Truth Predictions',
+                            data: steps.map(() => groundTruthPrediction),
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                            fill: false,
+                            tension: 0,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            borderWidth: 2,
+                            borderDash: [5, 5]
+                        },
+                        // Ground truth labels (horizontal dotted line)
+                        {
+                            label: 'Ground Truth Labels',
+                            data: steps.map(() => groundTruthLabel),
+                            borderColor: '#96ceb4',
+                            backgroundColor: 'rgba(150, 206, 180, 0.1)',
+                            fill: false,
+                            tension: 0,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            borderWidth: 2,
+                            borderDash: [10, 5]
+                        }
+                    ];
+                    
+                    chart.data = {
+                        labels: steps,
+                        datasets: datasets
+                    };
+                    
+                    chart.update('none');
+                }
+                
+                // Update progress indicators for prediction charts
+                this.updatePredictionChartProgress();
+            }
+            
+            updatePredictionChartProgress() {
+                if (!this.charts.predictions) return;
+                
+                Object.values(this.charts.predictions).forEach(chart => {
+                    // Remove existing progress line (if any)
+                    const datasets = chart.data.datasets;
+                    const progressDatasetIndex = datasets.findIndex(ds => ds.label === 'Current Step');
+                    if (progressDatasetIndex !== -1) {
+                        datasets.splice(progressDatasetIndex, 1);
+                    }
+                    
+                    // Theme-aware progress indicator colors
+                    const progressColors = this.theme === 'dark' 
+                        ? { border: '#ffffff', background: '#ffffff' }
+                        : { border: '#212529', background: '#ffffff' };
+                    
+                    // Add progress line for oracle predictions (first dataset)
+                    if (datasets[0] && datasets[0].data[this.currentStep] !== undefined) {
+                        datasets.push({
+                            label: 'Current Step',
+                            type: 'scatter',
+                            data: [{
+                                x: this.currentStep,
+                                y: datasets[0].data[this.currentStep]
+                            }],
+                            borderColor: progressColors.border,
+                            backgroundColor: progressColors.background,
+                            borderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            showLine: false,
+                            order: -1
+                        });
+                    }
                     
                     chart.update('none');
                 });
