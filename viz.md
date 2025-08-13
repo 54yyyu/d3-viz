@@ -57,6 +57,7 @@ Visualization Data Format Documentation
   | sequence     | (batch_size, seq_length)    | int64      | Token indices (0=A, 1=C, 2=G, 3=T) at current step |
   | score_matrix | (batch_size, seq_length, 4) | float16/32 | Model's score predictions for each nucleotide      |
   | prob_matrix  | (batch_size, seq_length, 4) | float16/32 | Probability matrix from staggered score computation |
+  | attribution_matrix | (batch_size, seq_length, 4) | float16/32 | GradientSHAP attribution scores for each nucleotide [analysis only] |
   | noise_level  | scalar                      | float32    | Current noise level (σ)                            |
   | noise_rate   | scalar                      | float32    | Rate of noise change (dσ/dt)                       |
   | oracle_mse        | (batch_size,)               | float32    | Oracle MSE vs ground truth [evaluation only]      |

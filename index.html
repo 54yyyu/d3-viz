@@ -1417,6 +1417,7 @@
                             <div class="matrix-controls">
                                 <button class="toggle-btn active" data-type="score">Score</button>
                                 <button class="toggle-btn" data-type="prob">Prob</button>
+                                <button class="toggle-btn hidden" id="attributionBtn" data-type="attribution">Attribution</button>
                                 <button class="toggle-btn" data-type="both">Both</button>
                                 <button class="toggle-btn active" data-mode="heatmap">Heatmap</button>
                                 <button class="toggle-btn" data-mode="logo">Logo</button>
@@ -1556,7 +1557,7 @@
                     
                     <div class="param-group">
                         <label class="param-label">
-                            <input type="checkbox" id="includeRC" checked> Include reverse complement
+                            <input type="checkbox" id="includeRC"> Include reverse complement
                         </label>
                     </div>
                     
@@ -1614,6 +1615,7 @@
                 this.charts = {};
                 this.matrixMode = 'heatmap';
                 this.matrixType = 'score'; // 'score' or 'prob'
+                this.preferredSecondaryMatrix = 'prob'; // Track preferred secondary matrix for Both mode
                 this.theme = 'dark'; // Default theme
                 this.highlightedPosition = null; // Track highlighted nucleotide position
                 this.isScrollingSyncronized = false; // Prevent infinite scroll loop
@@ -1815,6 +1817,7 @@
                     sequence: stepData.sequences[this.currentSample],
                     scoreMatrix: stepData.score_matrices[this.currentSample],
                     probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                    attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                     oracleMse: stepData.oracle_mses[this.currentSample]
                 };
                 
@@ -2202,7 +2205,7 @@
                             
                             <div class="param-group">
                                 <label class="param-label">
-                                    <input type="checkbox" id="includeRC" checked> Include reverse complement
+                                    <input type="checkbox" id="includeRC"> Include reverse complement
                                 </label>
                             </div>
                             
@@ -2293,6 +2296,7 @@
                         sequence: stepData.sequences[this.currentSample],
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -2347,6 +2351,7 @@
                             sequence: stepData.sequences[this.currentSample],
                             scoreMatrix: stepData.score_matrices[this.currentSample],
                             probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                            attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                             oracleMse: stepData.oracle_mses[this.currentSample]
                         };
                         this.updateMatrix(sampleData);
@@ -2520,7 +2525,17 @@
                     }
                     
                     this.uploadedDatabase = text;
-                    this.elements.databaseFileName.textContent = file.name;
+                    
+                    // Show file stats with motif count
+                    try {
+                        const memeSuite = new MemeSuiteLite();
+                        const motifs = memeSuite.readMeme(text);
+                        const motifCount = Object.keys(motifs).length;
+                        this.elements.databaseFileName.textContent = `${file.name} (${motifCount} motifs)`;
+                    } catch (error) {
+                        this.elements.databaseFileName.textContent = file.name;
+                    }
+                    
                     this.elements.databaseUpload.classList.add('has-file');
                     this.updateRunButtonState();
                     
@@ -3120,6 +3135,7 @@
                                 sequences: Array.from(step.get('sequence').value),
                                 score_matrices: Array.from(step.get('score_matrix').value),
                                 prob_matrices: step.has('prob_matrix') ? Array.from(step.get('prob_matrix').value) : null,
+                                attribution_matrices: step.has('attribution_matrix') ? Array.from(step.get('attribution_matrix').value) : null,
                                 oracle_mses: step.has('oracle_mse') ? Array.from(step.get('oracle_mse').value) : []
                             };
                             steps.push(stepData);
@@ -3160,6 +3176,18 @@
                     this.updateOriginalSequence();
                 } else {
                     this.elements.originalSequenceSection.style.display = 'none';
+                }
+                
+                // Show/hide attribution button based on data availability
+                // When attribution is available, show Score, Prob, and Attribution buttons
+                const attributionBtn = document.getElementById('attributionBtn');
+                const probBtn = document.querySelector('[data-type="prob"]');
+                if (this.data.steps && this.data.steps.length > 0 && this.data.steps[0].attribution_matrices) {
+                    attributionBtn.classList.remove('hidden');
+                    probBtn.classList.remove('hidden'); // Keep prob button visible when attribution is available
+                } else {
+                    attributionBtn.classList.add('hidden');
+                    probBtn.classList.remove('hidden'); // Show prob button when attribution is not available
                 }
                 
                 // Set up prediction plots sections based on data availability
@@ -3261,6 +3289,7 @@
                     sequence: stepData.sequences[this.currentSample],
                     scoreMatrix: stepData.score_matrices[this.currentSample],
                     probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                    attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                     oracleMse: stepData.oracle_mses[this.currentSample]
                 };
                 
@@ -3344,6 +3373,7 @@
                         sequence: stepData.sequences[this.currentSample],
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -3381,9 +3411,22 @@
             updateMatrix(sampleData) {
                 const matrixSection = document.querySelector('.score-matrix-section');
                 
-                if (this.matrixType === 'both' && sampleData.probMatrix) {
-                    // Show both matrices
-                    this.elements.matrixTitle.textContent = 'Score & Probability Matrices';
+                if (this.matrixType === 'both' && (sampleData.probMatrix || sampleData.attributionMatrix)) {
+                    // Show both matrices - score + preferred secondary matrix
+                    // Use user's preferred secondary matrix if available, otherwise fall back
+                    let secondaryMatrixType, secondaryTitle;
+                    if (this.preferredSecondaryMatrix === 'attribution' && sampleData.attributionMatrix) {
+                        secondaryMatrixType = 'attribution';
+                        secondaryTitle = 'Attribution';
+                    } else if (this.preferredSecondaryMatrix === 'prob' && sampleData.probMatrix) {
+                        secondaryMatrixType = 'prob';
+                        secondaryTitle = 'Probability';
+                    } else {
+                        // Fallback: use whatever is available
+                        secondaryMatrixType = sampleData.attributionMatrix ? 'attribution' : 'prob';
+                        secondaryTitle = sampleData.attributionMatrix ? 'Attribution' : 'Probability';
+                    }
+                    this.elements.matrixTitle.textContent = `Score & ${secondaryTitle} Matrices`;
                     this.elements.singleMatrixContainer.classList.add('hidden');
                     this.elements.dualMatrixContainer.classList.remove('hidden');
                     matrixSection.classList.add('dual-mode');
@@ -3396,7 +3439,7 @@
                     }
                     
                     // Update both matrices
-                    this.updateDualMatrices(sampleData);
+                    this.updateDualMatrices(sampleData, secondaryMatrixType);
                 } else {
                     // Show single matrix
                     this.elements.singleMatrixContainer.classList.remove('hidden');
@@ -3407,29 +3450,45 @@
                     this.removeSynchronizedScrolling();
                     
                     // Determine which matrix to use
+                    // When attribution is available, treat 'prob' selection as 'attribution'
                     let currentMatrix;
-                    if (this.matrixType === 'prob' && sampleData.probMatrix) {
+                    let effectiveMatrixType = this.matrixType;
+                    
+                    // If user selected 'prob' but attribution is available (and prob is not), use attribution
+                    if (this.matrixType === 'prob' && sampleData.attributionMatrix && !sampleData.probMatrix) {
+                        effectiveMatrixType = 'attribution';
+                    }
+                    
+                    if (effectiveMatrixType === 'prob' && sampleData.probMatrix) {
                         currentMatrix = sampleData.probMatrix;
                         this.elements.matrixTitle.textContent = 'Probability Matrix';
+                    } else if (effectiveMatrixType === 'attribution' && sampleData.attributionMatrix) {
+                        currentMatrix = sampleData.attributionMatrix;
+                        this.elements.matrixTitle.textContent = 'Attribution Matrix';
                     } else {
                         currentMatrix = sampleData.scoreMatrix;
                         this.elements.matrixTitle.textContent = 'Score Matrix';
-                        // If prob was selected but not available, fall back to score
-                        if (this.matrixType === 'prob') {
+                        // If prob or attribution was selected but not available, fall back to score
+                        if (this.matrixType === 'prob' || this.matrixType === 'attribution') {
                             this.setMatrixType('score');
                         }
                     }
                     
                     if (this.matrixMode === 'heatmap') {
-                        this.updateHeatmap(currentMatrix);
+                        this.updateHeatmapInContainer(currentMatrix, effectiveMatrixType, this.elements.heatmapContainer, this.elements.heatmapLegend);
                     } else {
-                        this.updateLogo(currentMatrix);
+                        this.updateLogoInContainer(currentMatrix, effectiveMatrixType, this.elements.logoContainer);
                     }
                 }
             }
             
             setMatrixType(type) {
                 this.matrixType = type;
+                
+                // Track preferred secondary matrix for Both mode
+                if (type === 'prob' || type === 'attribution') {
+                    this.preferredSecondaryMatrix = type;
+                }
                 
                 // Update button states for matrix type
                 document.querySelectorAll('.toggle-btn[data-type]').forEach(btn => {
@@ -3443,13 +3502,22 @@
                         sequence: stepData.sequences[this.currentSample],
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
                 }
             }
             
-            updateDualMatrices(sampleData) {
+            updateDualMatrices(sampleData, secondaryMatrixType = 'prob') {
+                const secondaryMatrix = secondaryMatrixType === 'attribution' ? sampleData.attributionMatrix : sampleData.probMatrix;
+                
+                // Update the subtitle of the second matrix
+                const probMatrixSubtitle = document.querySelector('.matrix-section:last-child .matrix-subtitle');
+                if (probMatrixSubtitle) {
+                    probMatrixSubtitle.textContent = secondaryMatrixType === 'attribution' ? 'Attribution Matrix' : 'Probability Matrix';
+                }
+                
                 if (this.matrixMode === 'heatmap') {
                     // Show heatmaps, hide logos
                     this.elements.scoreLogoContainer.classList.add('hidden');
@@ -3463,8 +3531,8 @@
                     this.updateHeatmapInContainer(sampleData.scoreMatrix, 'score', 
                         this.elements.scoreHeatmapContainer, this.elements.scoreHeatmapLegend);
                     
-                    // Update prob matrix heatmap
-                    this.updateHeatmapInContainer(sampleData.probMatrix, 'prob', 
+                    // Update secondary matrix heatmap (prob or attribution)
+                    this.updateHeatmapInContainer(secondaryMatrix, secondaryMatrixType, 
                         this.elements.probHeatmapContainer, this.elements.probHeatmapLegend);
                     
                     // Set up synchronized scrolling for heatmaps
@@ -3483,8 +3551,8 @@
                     this.updateLogoInContainer(sampleData.scoreMatrix, 'score', 
                         this.elements.scoreLogoContainer);
                     
-                    // Update prob matrix logo
-                    this.updateLogoInContainer(sampleData.probMatrix, 'prob', 
+                    // Update secondary matrix logo (prob or attribution)
+                    this.updateLogoInContainer(secondaryMatrix, secondaryMatrixType, 
                         this.elements.probLogoContainer);
                     
                     // Set up synchronized scrolling for logos
@@ -3534,13 +3602,6 @@
                 }
             }
             
-            updateHeatmap(matrix) {
-                this.updateHeatmapInContainer(matrix, this.matrixType, this.elements.heatmapContainer, this.elements.heatmapLegend);
-            }
-            
-            updateLogo(matrix) {
-                this.updateLogoInContainer(matrix, this.matrixType, this.elements.logoContainer);
-            }
             
             updateHeatmapInContainer(matrix, matrixType, container, legendContainer) {
                 container.innerHTML = '';
@@ -3560,6 +3621,11 @@
                     colorScale = d3.scaleSequential(d3.interpolateRdBu)
                         .domain([1, 0]); // Reversed: 1=red (high prob), 0=blue (low prob)
                     valueLabel = 'Probability';
+                } else if (matrixType === 'attribution') {
+                    // For attribution matrix: use diverging scale centered at 0
+                    colorScale = d3.scaleSequential(d3.interpolateRdBu)
+                        .domain([1, -1]); // Blue for negative attribution, red for positive
+                    valueLabel = 'Attribution';
                 } else {
                     // For score matrix: keep original scale
                     colorScale = d3.scaleSequential(d3.interpolateRdBu)
@@ -3677,6 +3743,14 @@
             
             updateLogoInContainer(matrix, matrixType, container) {
                 container.innerHTML = '';
+                
+                // For attribution matrices with negative values, use LogoWithNegatives
+                if (matrixType === 'attribution') {
+                    this.createAttributionLogo(matrix, container);
+                    // Add selection overlay for attribution logos too
+                    this.addLogoSelectionOverlay(container, matrix);
+                    return;
+                }
                 
                 // Validate and process matrix for information content (bits mode)
                 let processedMatrix = [];
@@ -3812,7 +3886,7 @@
                 container.style.position = 'relative';
                 
                 // Calculate precise position mapping by examining the actual logo SVG
-                const logoDiv = container.querySelector('div[id^="dna-logo-"]');
+                const logoDiv = container.querySelector('div[id^="dna-logo-"], div[id^="attribution-logo-"]');
                 let positionWidth = 20; // Default fallback
                 let leftOffset = 50;    // Default fallback
                 
@@ -3895,6 +3969,112 @@
                     
                     container.appendChild(selectionOverlay);
                 }
+            }
+            
+            createAttributionLogo(matrix, container) {
+                try {
+                    // Create a div for the attribution logo
+                    const logoDiv = document.createElement('div');
+                    logoDiv.id = 'attribution-logo-' + Date.now();
+                    container.appendChild(logoDiv);
+                    
+                    // Get theme-appropriate colors for DNA bases
+                    const themeColors = this.getThemeBasesColors();
+                    
+                    // Create custom DNA alphabet with theme colors
+                    const customAlphabet = [
+                        {regex: 'A', color: themeColors.A, component: logojs.A},
+                        {regex: 'C', color: themeColors.C, component: logojs.C}, 
+                        {regex: 'G', color: themeColors.G, component: logojs.G},
+                        {regex: 'T', color: themeColors.T, component: logojs.T}
+                    ];
+                    
+                    // Calculate optimal logo width based on motif length - match score/prob logos
+                    const logoWidth = matrix.length * 20 + 100;
+                    
+                    // Configuration for LogoWithNegatives
+                    const logoConfig = {
+                        values: matrix, // Attribution matrix with negative/positive values
+                        alphabet: customAlphabet,
+                        width: logoWidth,
+                        height: 240, // Taller to accommodate negative values
+                        scale: null, // Let it auto-scale
+                        negativealpha: 128, // Semi-transparent for negative values
+                        inverted: false,
+                        style: {
+                            textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
+                            axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
+                        }
+                    };
+                    
+                    // Use LogoJS LogoWithNegatives for attribution
+                    if (typeof logojs !== 'undefined' && logojs.embedLogoWithNegatives) {
+                        logojs.embedLogoWithNegatives(logoDiv, logoConfig);
+                    } else {
+                        throw new Error('LogoJS LogoWithNegatives not available');
+                    }
+                } catch (error) {
+                    console.warn('Attribution logo creation failed, using fallback:', error);
+                    // Fallback: create a simple text representation showing positive/negative
+                    container.innerHTML = this.createAttributionFallbackLogo(matrix);
+                }
+            }
+            
+            createAttributionFallbackLogo(matrix) {
+                if (!Array.isArray(matrix) || matrix.length === 0) {
+                    return '<div style="color: #888; text-align: center; padding: 40px;">Invalid attribution matrix data</div>';
+                }
+                
+                const baseLetters = ['A', 'C', 'G', 'T'];
+                const themeColors = this.getThemeBasesColors();
+                const baseColors = [themeColors.A, themeColors.C, themeColors.G, themeColors.T];
+                
+                let html = '<div style="font-family: monospace; font-size: 14px; text-align: center; padding: 20px; color: #888;">';
+                html += '<div style="margin-bottom: 10px;">Attribution Logo (Fallback)</div>';
+                html += '<div style="position: relative; display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; max-width: 100%; overflow-x: auto; height: 120px;">';
+                
+                // Add zero line
+                html += '<div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #666; z-index: 0;"></div>';
+                
+                for (let i = 0; i < Math.min(matrix.length, 60); i++) {
+                    const position = matrix[i];
+                    
+                    if (!Array.isArray(position) || position.length !== 4) {
+                        html += '<span style="color: #666; position: relative; z-index: 1;">?</span>';
+                        continue;
+                    }
+                    
+                    // Find the base with the highest absolute attribution value
+                    let maxIdx = 0;
+                    let maxAbsVal = Math.abs(position[0] || 0);
+                    for (let j = 1; j < position.length; j++) {
+                        const absVal = Math.abs(position[j] || 0);
+                        if (absVal > maxAbsVal) {
+                            maxAbsVal = absVal;
+                            maxIdx = j;
+                        }
+                    }
+                    
+                    const value = position[maxIdx] || 0;
+                    const absValue = Math.abs(value);
+                    const isPositive = value >= 0;
+                    
+                    if (absValue > 0.01) { // Only show significant attributions
+                        const opacity = Math.max(0.3, Math.min(1, absValue)); // Scale opacity by magnitude
+                        const fontSize = Math.max(8, 12 * absValue); // Scale size by magnitude
+                        const transform = isPositive ? 'translateY(-25%)' : 'translateY(25%) scaleY(-1)'; // Flip negative values
+                        
+                        html += `<span style="color: ${baseColors[maxIdx]}; opacity: ${opacity}; font-weight: bold; font-size: ${fontSize}px; position: relative; z-index: 1; transform: ${transform}; display: inline-block;">${baseLetters[maxIdx]}</span>`;
+                    } else {
+                        html += '<span style="color: #ccc; position: relative; z-index: 1;">·</span>';
+                    }
+                }
+                
+                html += '</div>';
+                html += '<div style="font-size: 10px; margin-top: 10px; color: #666;">LogoJS LogoWithNegatives unavailable - showing attribution fallback</div>';
+                html += '</div>';
+                
+                return html;
             }
             
             createFallbackLogo(scoreMatrix) {
@@ -4037,6 +4217,7 @@
                         sequence: stepData.sequences[this.currentSample],
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -4619,12 +4800,14 @@
                 // Generate unique ID for this gradient to avoid conflicts
                 const uniqueId = `gradient-${matrixType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 
-                // Create legend HTML
+                // Create legend HTML with appropriate labels
+                const leftLabel = matrixType === 'attribution' ? 'Negative' : 'Low';
+                const rightLabel = matrixType === 'attribution' ? 'Positive' : 'High';
                 container.innerHTML = `
                     <div class="legend-labels">
-                        <span>Low</span>
+                        <span>${leftLabel}</span>
                         <span>${valueLabel}</span>
-                        <span>High</span>
+                        <span>${rightLabel}</span>
                     </div>
                     <div class="legend-gradient"></div>
                 `;
@@ -4650,6 +4833,8 @@
                     let colorValue;
                     if (matrixType === 'prob') {
                         colorValue = colorScale(t); // For prob: 0 to 1
+                    } else if (matrixType === 'attribution') {
+                        colorValue = colorScale(1 - 2*t); // For attribution: 1 to -1 (positive to negative)
                     } else {
                         colorValue = colorScale(2*t); // For score: keep original scale
                     }
