@@ -2992,21 +2992,31 @@
                         
                         // Calculate optimal logo width based on motif length - adapt to user settings
                         const logoWidth = Math.max(200, convertedMatrix.length * this.logoWidth / 60 * 18 + 80); // Adapt to configurable sizing
+                        // Only pass custom dimensions if they differ from defaults
                         const logoConfig = {
                             ppm: convertedMatrix,
                             alphabet: customAlphabet,
                             width: logoWidth,
                             height: this.logoHeight * 0.6, // Scale container height with user control
-                            glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
-                            // yAxisMax: (200 / this.logoHeight) * 2.0, // Removed to avoid inverse relationship
                             mode: 'INFORMATION_CONTENT',
-                            preserveAspectRatio: false, // Disable aspect ratio preservation
-                            fixedAspectRatio: false, // Disable fixed aspect ratio
                             style: {
                                 textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
                                 axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
                             }
                         };
+                        
+                        // Add custom dimensions only if they're different from defaults
+                        if (this.logoHeight !== 200) {
+                            // Independent height control: scale proportionally from default
+                            // Default 200 -> scale factor 1.0, so scale = this.logoHeight / 200
+                            // Apply scale to the base calculation: (100.0 * max) * scale
+                            logoConfig.customMaxHeight = this.logoHeight;
+                        }
+                        if (this.logoWidth !== 60) {
+                            // Independent width control: scale user width to internal glyph width
+                            // Default internal glyph width = 200/6 = 33.33, so scale accordingly
+                            logoConfig.customGlyphWidth = this.logoWidth * (200/6.0) / 60;
+                        }
                         
                         // Hide x-axis labels when glyph width is too small
                         const hideXAxisLabels = this.logoWidth < 40;
@@ -3927,16 +3937,13 @@
                 
                 // Configure logojs with configurable size - adapt container to actual logo size
                 const logoWidth = Math.max(200, processedMatrix.length * this.logoWidth / 60 * 20 + 100); // More precise width calculation
+                // Only pass custom dimensions if they differ from defaults  
                 const logoConfig = {
                     ppm: processedMatrix,
                     alphabet: customAlphabet,
                     width: logoWidth,
                     height: this.logoHeight,
-                    glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
-                    // yAxisMax: (200 / this.logoHeight) * 2.0, // Removed to avoid inverse relationship
                     mode: 'INFORMATION_CONTENT',
-                    preserveAspectRatio: false, // Disable aspect ratio preservation
-                    fixedAspectRatio: false, // Disable fixed aspect ratio
                     // Add theme-aware styling
                     style: {
                         textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
@@ -3944,6 +3951,17 @@
                         gridColor: this.theme === 'dark' ? '#333' : '#dee2e6'
                     }
                 };
+                
+                // Add custom dimensions only if they're different from defaults
+                if (this.logoHeight !== 200) {
+                    // Independent height control: scale proportionally from default
+                    logoConfig.customMaxHeight = this.logoHeight;
+                }
+                if (this.logoWidth !== 60) {
+                    // Independent width control: scale user width to internal glyph width
+                    // Default internal glyph width = 200/6 = 33.33, so scale accordingly
+                    logoConfig.customGlyphWidth = this.logoWidth * (200/6.0) / 60;
+                }
                 
                 // Hide x-axis labels when glyph width is too small
                 const hideXAxisLabels = this.logoWidth < 40;
@@ -4137,22 +4155,29 @@
                     // Calculate optimal logo width based on motif length - use configurable sizing and adapt container
                     const logoWidth = Math.max(200, matrix.length * this.logoWidth / 60 * 20 + 100); // More precise width calculation
                     
-                    // Configuration for LogoWithNegatives
+                    // Configuration for LogoWithNegatives  
                     const logoConfig = {
                         values: matrix, // Attribution matrix with negative/positive values
                         alphabet: customAlphabet,
                         width: logoWidth,
                         height: this.logoHeight, // Use configurable height like regular logos
-                        glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
                         negativealpha: 128, // Semi-transparent for negative values
                         inverted: false,
-                        preserveAspectRatio: false, // Disable aspect ratio preservation
-                        fixedAspectRatio: false, // Disable fixed aspect ratio
                         style: {
                             textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
                             axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
                         }
                     };
+                    
+                    // Add custom dimensions only if they're different from defaults
+                    if (this.logoHeight !== 200) {
+                        logoConfig.logoHeightScale = this.logoHeight;
+                    }
+                    if (this.logoWidth !== 60) {
+                        // Scale width: default 60 maps to ~33.33 internal units (200/6)  
+                        // So we scale: this.logoWidth * (33.33/60) = this.logoWidth * 0.5555
+                        logoConfig.logoWidthScale = this.logoWidth * (200/6.0) / 60;
+                    }
                     
                     // Hide x-axis labels when glyph width is too small
                     const hideXAxisLabels = this.logoWidth < 40;
