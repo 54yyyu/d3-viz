@@ -338,6 +338,70 @@
         
         .matrix-controls {
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .logo-controls {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            padding: 4px 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        
+        .logo-controls.visible {
+            display: flex;
+        }
+        
+        .logo-control-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .logo-control-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .logo-dimension-input {
+            width: 50px;
+            height: 24px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 10px;
+            text-align: center;
+        }
+        
+        .logo-download-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 12px;
+        }
+        
+        .logo-download-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
         }
         
         .toggle-btn {
@@ -402,8 +466,9 @@
         
         .logo-container {
             display: inline-block;
-            min-width: 100%;
+            min-width: 200px; /* Allow smaller logos */
             width: max-content; /* Allow container to expand to content width */
+            max-width: 100%; /* Don't exceed parent container */
         }
         
         .heatmap-legend {
@@ -1421,6 +1486,21 @@
                                 <button class="toggle-btn" data-type="both">Both</button>
                                 <button class="toggle-btn active" data-mode="heatmap">Heatmap</button>
                                 <button class="toggle-btn" data-mode="logo">Logo</button>
+                                <div class="logo-controls" id="logoControls">
+                                    <div class="logo-control-group">
+                                        <span class="logo-control-label">W:</span>
+                                        <input type="number" class="logo-dimension-input" id="logoWidth" value="60" min="20" max="120">
+                                    </div>
+                                    <div class="logo-control-group">
+                                        <span class="logo-control-label">H:</span>
+                                        <input type="number" class="logo-dimension-input" id="logoHeight" value="200" min="80" max="300">
+                                    </div>
+                                    <button class="logo-download-btn" id="logoDownload" title="Download Logo">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 15.5l-3.5-3.5h2.5v-6h2v6h2.5l-3.5 3.5zm7.5 3.5h-15v-2h15v2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="matrix-display">
@@ -1617,6 +1697,8 @@
                 this.matrixType = 'score'; // 'score' or 'prob'
                 this.preferredSecondaryMatrix = 'prob'; // Track preferred secondary matrix for Both mode
                 this.theme = 'dark'; // Default theme
+                this.logoWidth = 60; // Default logo width per position
+                this.logoHeight = 200; // Default logo height
                 this.highlightedPosition = null; // Track highlighted nucleotide position
                 this.isScrollingSyncronized = false; // Prevent infinite scroll loop
                 this.scrollHandlers = null; // Store scroll event handlers for cleanup
@@ -1673,6 +1755,11 @@
                     speedSlider: document.getElementById('speedSlider'),
                     themeToggle: document.getElementById('themeToggle'),
                     themeIcon: document.getElementById('themeIcon'),
+                    // Logo controls
+                    logoControls: document.getElementById('logoControls'),
+                    logoWidth: document.getElementById('logoWidth'),
+                    logoHeight: document.getElementById('logoHeight'),
+                    logoDownload: document.getElementById('logoDownload'),
                     // TOMTOM elements
                     tomtomPanel: document.getElementById('tomtomPanel'),
                     tomtomToggle: document.getElementById('tomtomToggle'),
@@ -1722,6 +1809,11 @@
                 
                 // Theme toggle
                 this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+                
+                // Logo controls
+                this.elements.logoWidth.addEventListener('input', () => this.updateLogoSizing());
+                this.elements.logoHeight.addEventListener('input', () => this.updateLogoSizing());
+                this.elements.logoDownload.addEventListener('click', () => this.downloadLogo());
                 
                 // Keyboard navigation
                 document.addEventListener('keydown', (e) => this.handleKeydown(e));
@@ -2898,19 +2990,29 @@
                             {regex: 'T', color: themeColors.T, component: logojs.T}
                         ];
                         
-                        // Calculate optimal logo width based on motif length
-                        const logoWidth = Math.min(convertedMatrix.length * 18 + 60, 300);
+                        // Calculate optimal logo width based on motif length - adapt to user settings
+                        const logoWidth = Math.max(200, convertedMatrix.length * this.logoWidth / 60 * 18 + 80); // Adapt to configurable sizing
                         const logoConfig = {
                             ppm: convertedMatrix,
                             alphabet: customAlphabet,
                             width: logoWidth,
-                            height: 120,
+                            height: this.logoHeight * 0.6, // Scale container height with user control
+                            glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
+                            // yAxisMax: (200 / this.logoHeight) * 2.0, // Removed to avoid inverse relationship
                             mode: 'INFORMATION_CONTENT',
+                            preserveAspectRatio: false, // Disable aspect ratio preservation
+                            fixedAspectRatio: false, // Disable fixed aspect ratio
                             style: {
                                 textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
                                 axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
                             }
                         };
+                        
+                        // Hide x-axis labels when glyph width is too small
+                        const hideXAxisLabels = this.logoWidth < 40;
+                        
+                        // Set container width to match logo width
+                        container.style.width = logoWidth + 'px';
                         
                         if (logojs.embedLogo) {
                             logojs.embedLogo(logoDiv, logoConfig);
@@ -2918,6 +3020,11 @@
                             logojs.embedDNALogo(logoDiv, logoConfig);
                         } else {
                             throw new Error('LogoJS embedding functions not available');
+                        }
+                        
+                        // Hide x-axis labels if glyph width is too small
+                        if (hideXAxisLabels) {
+                            setTimeout(() => this.hideLogoXAxisLabels(logoDiv), 100);
                         }
                     } else {
                         throw new Error('LogoJS not available');
@@ -3744,6 +3851,9 @@
             updateLogoInContainer(matrix, matrixType, container) {
                 container.innerHTML = '';
                 
+                // Reset container width to allow proper sizing
+                container.style.width = 'auto';
+                
                 // For attribution matrices with negative values, use LogoWithNegatives
                 if (matrixType === 'attribution') {
                     this.createAttributionLogo(matrix, container);
@@ -3815,14 +3925,18 @@
                     {regex: 'T', color: themeColors.T, component: logojs.T}
                 ];
                 
-                // Configure logojs with perfect size - no width limits!
-                const logoWidth = processedMatrix.length * 20 + 100;
+                // Configure logojs with configurable size - adapt container to actual logo size
+                const logoWidth = Math.max(200, processedMatrix.length * this.logoWidth / 60 * 20 + 100); // More precise width calculation
                 const logoConfig = {
                     ppm: processedMatrix,
                     alphabet: customAlphabet,
                     width: logoWidth,
-                    height: 200,
+                    height: this.logoHeight,
+                    glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
+                    // yAxisMax: (200 / this.logoHeight) * 2.0, // Removed to avoid inverse relationship
                     mode: 'INFORMATION_CONTENT',
+                    preserveAspectRatio: false, // Disable aspect ratio preservation
+                    fixedAspectRatio: false, // Disable fixed aspect ratio
                     // Add theme-aware styling
                     style: {
                         textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
@@ -3830,6 +3944,12 @@
                         gridColor: this.theme === 'dark' ? '#333' : '#dee2e6'
                     }
                 };
+                
+                // Hide x-axis labels when glyph width is too small
+                const hideXAxisLabels = this.logoWidth < 40;
+                
+                // Set container width to match logo width
+                container.style.width = logoWidth + 'px';
                 
                 // Use LogoJS to create the logo
                 if (typeof logojs === 'undefined') {
@@ -3846,6 +3966,11 @@
                     } else {
                         // Fallback to simple text display
                         container.innerHTML = this.createFallbackLogo(matrix);
+                    }
+                    
+                    // Hide x-axis labels if glyph width is too small
+                    if (hideXAxisLabels) {
+                        setTimeout(() => this.hideLogoXAxisLabels(logoDiv), 100);
                     }
                 } catch (error) {
                     console.error('Error creating logo:', error);
@@ -3865,6 +3990,23 @@
                     G: style.getPropertyValue('--base-g-color').trim(),
                     T: style.getPropertyValue('--base-t-color').trim()
                 };
+            }
+            
+            hideLogoXAxisLabels(logoDiv) {
+                // Find and hide x-axis text labels in the logo SVG
+                if (logoDiv && logoDiv.firstChild && logoDiv.firstChild.tagName === 'svg') {
+                    const svg = logoDiv.firstChild;
+                    const textElements = svg.querySelectorAll('text');
+                    textElements.forEach(text => {
+                        // Hide x-axis labels (position numbers)
+                        // X-axis labels typically have specific positioning and text content
+                        const textContent = text.textContent.trim();
+                        const isNumber = /^\d+$/.test(textContent);
+                        if (isNumber) {
+                            text.style.display = 'none';
+                        }
+                    });
+                }
             }
             
             addLogoSelectionOverlay(container, matrix) {
@@ -3887,12 +4029,12 @@
                 
                 // Calculate precise position mapping by examining the actual logo SVG
                 const logoDiv = container.querySelector('div[id^="dna-logo-"], div[id^="attribution-logo-"]');
-                let positionWidth = 20; // Default fallback
+                let positionWidth = this.logoWidth; // Use configurable width
                 let leftOffset = 50;    // Default fallback
                 
                 if (logoDiv && logoDiv.firstChild && logoDiv.firstChild.tagName === 'svg') {
                     const svg = logoDiv.firstChild;
-                    const svgWidth = parseFloat(svg.getAttribute('width')) || (matrix.length * 20 + 100);
+                    const svgWidth = parseFloat(svg.getAttribute('width')) || (matrix.length * this.logoWidth + 100);
                     const matrixLength = matrix.length;
                     
                     // Calculate actual position width and offset based on SVG dimensions
@@ -3973,6 +4115,9 @@
             
             createAttributionLogo(matrix, container) {
                 try {
+                    // Reset container width to allow proper sizing
+                    container.style.width = 'auto';
+                    
                     // Create a div for the attribution logo
                     const logoDiv = document.createElement('div');
                     logoDiv.id = 'attribution-logo-' + Date.now();
@@ -3989,29 +4134,42 @@
                         {regex: 'T', color: themeColors.T, component: logojs.T}
                     ];
                     
-                    // Calculate optimal logo width based on motif length - match score/prob logos
-                    const logoWidth = matrix.length * 20 + 100;
+                    // Calculate optimal logo width based on motif length - use configurable sizing and adapt container
+                    const logoWidth = Math.max(200, matrix.length * this.logoWidth / 60 * 20 + 100); // More precise width calculation
                     
                     // Configuration for LogoWithNegatives
                     const logoConfig = {
                         values: matrix, // Attribution matrix with negative/positive values
                         alphabet: customAlphabet,
                         width: logoWidth,
-                        height: 240, // Taller to accommodate negative values
-                        scale: null, // Let it auto-scale
+                        height: this.logoHeight, // Use configurable height like regular logos
+                        glyphwidth: this.logoWidth / 60, // Scale glyph width based on user control
                         negativealpha: 128, // Semi-transparent for negative values
                         inverted: false,
+                        preserveAspectRatio: false, // Disable aspect ratio preservation
+                        fixedAspectRatio: false, // Disable fixed aspect ratio
                         style: {
                             textColor: this.theme === 'dark' ? '#ffffff' : '#6c757d',
                             axisColor: this.theme === 'dark' ? '#ffffff' : '#6c757d'
                         }
                     };
                     
+                    // Hide x-axis labels when glyph width is too small
+                    const hideXAxisLabels = this.logoWidth < 40;
+                    
+                    // Set container width to match logo width
+                    container.style.width = logoWidth + 'px';
+                    
                     // Use LogoJS LogoWithNegatives for attribution
                     if (typeof logojs !== 'undefined' && logojs.embedLogoWithNegatives) {
                         logojs.embedLogoWithNegatives(logoDiv, logoConfig);
                     } else {
                         throw new Error('LogoJS LogoWithNegatives not available');
+                    }
+                    
+                    // Hide x-axis labels if glyph width is too small
+                    if (hideXAxisLabels) {
+                        setTimeout(() => this.hideLogoXAxisLabels(logoDiv), 100);
                     }
                 } catch (error) {
                     console.warn('Attribution logo creation failed, using fallback:', error);
@@ -4194,6 +4352,9 @@
                 document.querySelectorAll('.toggle-btn[data-mode]').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.mode === mode);
                 });
+                
+                // Show/hide logo controls based on mode
+                this.elements.logoControls.classList.toggle('visible', mode === 'logo');
                 
                 // Update CSS classes for height adjustment
                 const matrixSection = document.querySelector('.score-matrix-section');
@@ -4848,6 +5009,117 @@
                     .attr('width', '100%')
                     .attr('height', '100%')
                     .style('fill', `url(#${uniqueId})`);
+            }
+            
+            updateLogoSizing() {
+                // Update logo sizing properties from controls
+                this.logoWidth = parseInt(this.elements.logoWidth.value) || 60;
+                this.logoHeight = parseInt(this.elements.logoHeight.value) || 200;
+                
+                // Refresh logos if currently in logo mode
+                if (this.matrixMode === 'logo' && this.data) {
+                    const stepData = this.data.steps[this.currentStep];
+                    const sampleData = {
+                        sequence: stepData.sequences[this.currentSample],
+                        scoreMatrix: stepData.score_matrices[this.currentSample],
+                        probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        oracleMse: stepData.oracle_mses[this.currentSample]
+                    };
+                    this.updateMatrix(sampleData);
+                }
+            }
+            
+            async downloadLogo() {
+                if (this.matrixMode !== 'logo' || !this.data) {
+                    alert('Please switch to logo mode to download logos');
+                    return;
+                }
+                
+                try {
+                    // Find all logo containers that are currently visible
+                    const logoContainers = [];
+                    
+                    if (!this.elements.singleMatrixContainer.classList.contains('hidden')) {
+                        // Single matrix mode
+                        const logoDiv = this.elements.logoContainer.querySelector('div[id^="dna-logo-"], div[id^="attribution-logo-"]');
+                        if (logoDiv) logoContainers.push({ div: logoDiv, name: this.matrixType });
+                    } else if (!this.elements.dualMatrixContainer.classList.contains('hidden')) {
+                        // Dual matrix mode
+                        const scoreLogoDiv = this.elements.scoreLogoContainer.querySelector('div[id^="dna-logo-"], div[id^="attribution-logo-"]');
+                        const probLogoDiv = this.elements.probLogoContainer.querySelector('div[id^="dna-logo-"], div[id^="attribution-logo-"]');
+                        if (scoreLogoDiv) logoContainers.push({ div: scoreLogoDiv, name: 'score' });
+                        if (probLogoDiv) {
+                            const secondaryType = this.preferredSecondaryMatrix;
+                            logoContainers.push({ div: probLogoDiv, name: secondaryType });
+                        }
+                    }
+                    
+                    // Download each logo
+                    for (const container of logoContainers) {
+                        await this.downloadLogoFromContainer(container.div, container.name);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error downloading logo:', error);
+                    alert('Error downloading logo: ' + error.message);
+                }
+            }
+            
+            async downloadLogoFromContainer(logoDiv, matrixName) {
+                const svg = logoDiv.querySelector('svg');
+                if (!svg) {
+                    throw new Error('No logo SVG found to download');
+                }
+                
+                // Clone the SVG to avoid modifying the original
+                const svgClone = svg.cloneNode(true);
+                
+                // Create canvas for rasterization
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size based on SVG dimensions
+                const svgRect = svg.getBoundingClientRect();
+                canvas.width = svgRect.width * 2; // 2x for higher quality
+                canvas.height = svgRect.height * 2;
+                
+                // Scale context for high DPI
+                ctx.scale(2, 2);
+                
+                // Convert SVG to blob and then to image
+                const svgData = new XMLSerializer().serializeToString(svgClone);
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Draw image to canvas
+                        ctx.fillStyle = this.theme === 'dark' ? '#0a0a0a' : '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width / 2, canvas.height / 2);
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Convert to blob and download
+                        canvas.toBlob((blob) => {
+                            const downloadUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = downloadUrl;
+                            a.download = `logo_${matrixName}_sample${this.currentSample + 1}_step${this.currentStep}.png`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(downloadUrl);
+                            URL.revokeObjectURL(url);
+                            resolve();
+                        }, 'image/png');
+                    };
+                    img.onerror = () => {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('Failed to load SVG for download'));
+                    };
+                    img.src = url;
+                });
             }
             
             togglePlay() {
