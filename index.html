@@ -3653,8 +3653,8 @@
                         this.elements.probHeatmapContainer, this.elements.probHeatmapLegend);
                     
                     // Set up synchronized scrolling for heatmaps
-                    this.setupSynchronizedScrolling(this.elements.scoreHeatmapContainer.parentElement, 
-                        this.elements.probHeatmapContainer.parentElement);
+                    this.setupSynchronizedScrolling(this.elements.scoreHeatmapContainer, 
+                        this.elements.probHeatmapContainer);
                 } else {
                     // Show logos, hide heatmaps
                     this.elements.scoreHeatmapContainer.classList.add('hidden');
