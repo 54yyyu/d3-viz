@@ -250,6 +250,24 @@ If you use this visualizer in your research, please cite:
 - [JASPAR Database](http://jaspar.genereg.net/)
 - [TF-MoDISco](https://github.com/kundajelab/tfmodisco)
 
+Here’s a citation section tailored for your repository, following the format you provided:
+
+---
+
+### Cite
+
+If you find **D3-Viz** helpful in your research, cite simply as:
+
+```bibtex
+@misc{d3viz,
+  author = {Yiyang Yu},
+  title = {D3-Viz: visualizer for DNA discrete diffusion},
+  year = {2025},
+  publisher = {GitHub},
+  url = {https://github.com/54yyyu/d3-viz}
+}
+```
+
 ## Support
 
 For issues and questions:
