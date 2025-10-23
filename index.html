@@ -1970,6 +1970,7 @@
                 this.highlightedPosition = null; // Track highlighted nucleotide position
                 this.isScrollingSyncronized = false; // Prevent infinite scroll loop
                 this.scrollHandlers = null; // Store scroll event handlers for cleanup
+                this.multiMatrixScrollPosition = 0; // Store scroll position for multi-matrix mode
                 
                 // TOMTOM-related properties
                 this.selectionMode = false;
@@ -4334,6 +4335,22 @@
                 }).join(' & ');
                 this.elements.matrixTitle.textContent = `${matrixNames} Matrices`;
 
+                // Check if there was previous content and save scroll position
+                let hadPreviousContent = false;
+                if (this.matrixMode === 'heatmap') {
+                    const existingContainer = this.elements.multiMatrixContainer.querySelector('.heatmap-container');
+                    if (existingContainer) {
+                        hadPreviousContent = true;
+                        this.multiMatrixScrollPosition = existingContainer.scrollLeft;
+                    }
+                } else {
+                    const existingContainer = this.elements.multiMatrixContainer.querySelector('.logo-scroll-container');
+                    if (existingContainer) {
+                        hadPreviousContent = true;
+                        this.multiMatrixScrollPosition = existingContainer.scrollLeft;
+                    }
+                }
+
                 // Clear existing content
                 this.elements.multiMatrixContainer.innerHTML = '';
 
@@ -4411,17 +4428,45 @@
                 if (this.matrixMode === 'heatmap') {
                     const heatmapContainers = Array.from(this.elements.multiMatrixContainer.querySelectorAll('.heatmap-container'));
                     this.setupMultiSynchronizedScrolling(heatmapContainers);
+
+                    // Restore scroll position only if there was previous content
+                    if (hadPreviousContent) {
+                        requestAnimationFrame(() => {
+                            heatmapContainers.forEach(container => {
+                                container.scrollLeft = this.multiMatrixScrollPosition;
+                            });
+                        });
+                    }
                 } else {
                     const logoScrollContainers = Array.from(this.elements.multiMatrixContainer.querySelectorAll('.logo-scroll-container'));
                     this.setupMultiSynchronizedScrolling(logoScrollContainers);
+
+                    // Restore scroll position only if there was previous content
+                    if (hadPreviousContent) {
+                        requestAnimationFrame(() => {
+                            logoScrollContainers.forEach(container => {
+                                container.scrollLeft = this.multiMatrixScrollPosition;
+                            });
+                        });
+                    }
                 }
             }
 
             setupMultiSynchronizedScrolling(containers) {
-                if (containers.length < 2) return;
-
                 // Remove any existing scroll listeners
                 this.removeSynchronizedScrolling();
+
+                if (containers.length < 2) {
+                    // For single container, just track scroll position
+                    if (containers.length === 1) {
+                        const handler = () => {
+                            this.multiMatrixScrollPosition = containers[0].scrollLeft;
+                        };
+                        containers[0].addEventListener('scroll', handler);
+                        this.scrollHandlers = [{ element: containers[0], handler }];
+                    }
+                    return;
+                }
 
                 // Store scroll handlers for cleanup
                 this.scrollHandlers = [];
@@ -4432,6 +4477,9 @@
                         if (!this.isScrollingSyncronized) {
                             this.isScrollingSyncronized = true;
                             const scrollLeft = container.scrollLeft;
+
+                            // Save scroll position to instance variable
+                            this.multiMatrixScrollPosition = scrollLeft;
 
                             // Sync all other containers
                             containers.forEach((otherContainer, otherIndex) => {
