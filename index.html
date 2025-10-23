@@ -511,25 +511,159 @@
             font-weight: 600;
         }
 
+        /* Multi-select matrix dropdown styles */
+        .multi-matrix-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .multi-matrix-dropdown-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            padding-right: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 10px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .multi-matrix-dropdown-btn:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .multi-matrix-dropdown-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .multi-matrix-dropdown-btn::after {
+            content: '▼';
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 8px;
+            opacity: 0.7;
+        }
+
+        .multi-matrix-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-top: 4px;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            padding: 8px 0;
+        }
+
+        .multi-matrix-dropdown-menu.show {
+            display: block;
+        }
+
+        .multi-matrix-dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .multi-matrix-dropdown-item:hover {
+            background: var(--input-hover-bg);
+        }
+
+        .multi-matrix-dropdown-item input[type="checkbox"] {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
+        .multi-matrix-dropdown-header {
+            padding: 6px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 4px;
+        }
+
+        .multi-matrix-dropdown-footer {
+            padding: 6px 12px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 4px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .multi-matrix-dropdown-footer button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .multi-matrix-dropdown-footer button:hover {
+            background: var(--input-hover-bg);
+        }
+
         .matrix-display {
             overflow-x: auto;
             max-height: 250px; /* Much taller to accommodate larger logo */
         }
         
+        .score-matrix-section.multi-mode {
+            max-height: none; /* No height constraint for multi matrix view */
+        }
+
+        .score-matrix-section.multi-mode.logo-mode {
+            max-height: none; /* No height constraint for multi logo view */
+        }
+
+        .score-matrix-section.multi-mode .matrix-display {
+            max-height: none; /* No height constraint - show all matrices */
+            overflow-y: visible; /* No vertical scrolling */
+            overflow-x: visible; /* Allow horizontal overflow for wide logos */
+        }
+
+        .score-matrix-section.multi-mode.logo-mode .matrix-display {
+            max-height: none; /* No height constraint */
+            overflow-x: auto; /* Allow horizontal scrolling for wide logos */
+        }
+
         .score-matrix-section.dual-mode {
             max-height: 500px; /* Expanded height for dual matrix view - heatmap */
         }
-        
+
         .score-matrix-section.dual-mode.logo-mode {
             max-height: 650px; /* Even taller for dual logo view */
         }
-        
+
         .score-matrix-section.dual-mode .matrix-display {
             max-height: 450px; /* Expanded height for dual matrix container - heatmap */
             overflow-y: auto; /* Allow scrolling if content exceeds */
             overflow-x: visible; /* Allow horizontal overflow for wide logos */
         }
-        
+
         .score-matrix-section.dual-mode.logo-mode .matrix-display {
             max-height: 600px; /* Even taller container for dual logo view */
             overflow-x: auto; /* Allow horizontal scrolling for wide logos */
@@ -568,7 +702,14 @@
             flex-direction: column;
             gap: 20px;
         }
-        
+
+        .multi-matrix-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+        }
+
         .matrix-section {
             border: 1px solid var(--border-color);
             border-radius: 6px;
@@ -1577,7 +1718,21 @@
                                 <button class="toggle-btn hidden" id="stagBtn" data-type="stag">Stag</button>
                                 <button class="toggle-btn hidden" id="transitionBtn" data-type="transition">Transition</button>
                                 <button class="toggle-btn hidden" id="attributionBtn" data-type="attribution">Attribution</button>
-                                <button class="toggle-btn" data-type="both">Both</button>
+                                <!-- Multi-select matrix dropdown for visualizing multiple matrices -->
+                                <div class="multi-matrix-dropdown hidden" id="multiMatrixDropdownContainer">
+                                    <button class="multi-matrix-dropdown-btn" id="multiMatrixDropdownBtn">
+                                        <span id="multiMatrixLabel">Multi (0)</span>
+                                    </button>
+                                    <div class="multi-matrix-dropdown-menu" id="multiMatrixDropdownMenu">
+                                        <div class="multi-matrix-dropdown-header">Select Matrices</div>
+                                        <!-- Checkbox items will be populated dynamically -->
+                                        <div id="multiMatrixCheckboxContainer"></div>
+                                        <div class="multi-matrix-dropdown-footer">
+                                            <button id="multiMatrixSelectAll">All</button>
+                                            <button id="multiMatrixClearAll">Clear</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button class="toggle-btn active" data-mode="heatmap">Heatmap</button>
                                 <button class="toggle-btn" data-mode="logo">Logo</button>
                                 <div class="logo-controls" id="logoControls">
@@ -1616,6 +1771,9 @@
                                     <div id="probLogoContainer" class="logo-container hidden"></div>
                                     <div id="probHeatmapLegend" class="heatmap-legend"></div>
                                 </div>
+                            </div>
+                            <div id="multiMatrixContainer" class="multi-matrix-container hidden">
+                                <!-- Matrix sections will be dynamically created here -->
                             </div>
                         </div>
                     </div>
@@ -1805,6 +1963,7 @@
                 this.matrixMode = 'heatmap';
                 this.matrixType = 'score'; // 'score' or 'prob'
                 this.preferredSecondaryMatrix = 'prob'; // Track preferred secondary matrix for Both mode
+                this.selectedMatrices = []; // Track selected matrices for multi-matrix view
                 this.theme = 'dark'; // Default theme
                 this.logoWidth = 60; // Default logo width per position
                 this.logoHeight = 200; // Default logo height
@@ -1878,6 +2037,15 @@
                     stagBtn: document.getElementById('stagBtn'),
                     transitionBtn: document.getElementById('transitionBtn'),
                     attributionBtn: document.getElementById('attributionBtn'),
+                    // Multi-matrix dropdown elements
+                    multiMatrixDropdownContainer: document.getElementById('multiMatrixDropdownContainer'),
+                    multiMatrixDropdownBtn: document.getElementById('multiMatrixDropdownBtn'),
+                    multiMatrixLabel: document.getElementById('multiMatrixLabel'),
+                    multiMatrixDropdownMenu: document.getElementById('multiMatrixDropdownMenu'),
+                    multiMatrixCheckboxContainer: document.getElementById('multiMatrixCheckboxContainer'),
+                    multiMatrixSelectAll: document.getElementById('multiMatrixSelectAll'),
+                    multiMatrixClearAll: document.getElementById('multiMatrixClearAll'),
+                    multiMatrixContainer: document.getElementById('multiMatrixContainer'),
                     // TOMTOM elements
                     tomtomPanel: document.getElementById('tomtomPanel'),
                     tomtomToggle: document.getElementById('tomtomToggle'),
@@ -1935,6 +2103,9 @@
 
                 // Matrix type dropdown controls
                 this.setupMatrixTypeDropdown();
+
+                // Multi-matrix dropdown controls
+                this.setupMultiMatrixDropdown();
 
                 // Keyboard navigation
                 document.addEventListener('keydown', (e) => this.handleKeydown(e));
@@ -2083,6 +2254,146 @@
                     if (availableTypes.length > 0) {
                         this.updateMatrixTypeDropdownSelection(availableTypes[0].type);
                     }
+                }
+            }
+
+            setupMultiMatrixDropdown() {
+                // Setup dropdown toggle
+                if (this.elements.multiMatrixDropdownBtn) {
+                    this.elements.multiMatrixDropdownBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.elements.multiMatrixDropdownMenu.classList.toggle('show');
+                    });
+                }
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.elements.multiMatrixDropdownContainer?.contains(e.target)) {
+                        this.elements.multiMatrixDropdownMenu?.classList.remove('show');
+                    }
+                });
+
+                // Setup "Select All" button
+                if (this.elements.multiMatrixSelectAll) {
+                    this.elements.multiMatrixSelectAll.addEventListener('click', () => {
+                        this.selectAllMatrices();
+                    });
+                }
+
+                // Setup "Clear All" button
+                if (this.elements.multiMatrixClearAll) {
+                    this.elements.multiMatrixClearAll.addEventListener('click', () => {
+                        this.clearAllMatrices();
+                    });
+                }
+            }
+
+            populateMultiMatrixDropdown(availableTypes) {
+                // availableTypes is an array of {type: 'score'|'prob'|'stag'|'transition'|'attribution', label: 'Score'}
+                if (!this.elements.multiMatrixCheckboxContainer) return;
+
+                // Clear existing checkboxes
+                this.elements.multiMatrixCheckboxContainer.innerHTML = '';
+
+                // Always include 'score' first
+                const allTypes = [{ type: 'score', label: 'Score' }, ...availableTypes];
+
+                // Add checkbox items
+                allTypes.forEach(typeInfo => {
+                    const item = document.createElement('div');
+                    item.className = 'multi-matrix-dropdown-item';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `multiMatrix_${typeInfo.type}`;
+                    checkbox.value = typeInfo.type;
+                    checkbox.checked = this.selectedMatrices.includes(typeInfo.type);
+
+                    const label = document.createElement('label');
+                    label.htmlFor = `multiMatrix_${typeInfo.type}`;
+                    label.textContent = typeInfo.label;
+                    label.style.cursor = 'pointer';
+                    label.style.flex = '1';
+
+                    checkbox.addEventListener('change', () => {
+                        this.toggleMatrixSelection(typeInfo.type);
+                    });
+
+                    item.appendChild(checkbox);
+                    item.appendChild(label);
+                    this.elements.multiMatrixCheckboxContainer.appendChild(item);
+                });
+            }
+
+            toggleMatrixSelection(matrixType) {
+                const index = this.selectedMatrices.indexOf(matrixType);
+                if (index === -1) {
+                    this.selectedMatrices.push(matrixType);
+                } else {
+                    this.selectedMatrices.splice(index, 1);
+                }
+
+                this.updateMultiMatrixLabel();
+                this.updateMultiMatrixVisualization();
+            }
+
+            selectAllMatrices() {
+                // Get all available matrix types from checkboxes
+                const checkboxes = this.elements.multiMatrixCheckboxContainer?.querySelectorAll('input[type="checkbox"]');
+                this.selectedMatrices = [];
+                checkboxes?.forEach(cb => {
+                    cb.checked = true;
+                    this.selectedMatrices.push(cb.value);
+                });
+
+                this.updateMultiMatrixLabel();
+                this.updateMultiMatrixVisualization();
+            }
+
+            clearAllMatrices() {
+                // Uncheck all checkboxes
+                const checkboxes = this.elements.multiMatrixCheckboxContainer?.querySelectorAll('input[type="checkbox"]');
+                checkboxes?.forEach(cb => {
+                    cb.checked = false;
+                });
+                this.selectedMatrices = [];
+
+                this.updateMultiMatrixLabel();
+                this.updateMultiMatrixVisualization();
+            }
+
+            updateMultiMatrixLabel() {
+                if (this.elements.multiMatrixLabel) {
+                    const count = this.selectedMatrices.length;
+                    if (count === 0) {
+                        this.elements.multiMatrixLabel.textContent = 'Multi (0)';
+                        this.elements.multiMatrixDropdownBtn.classList.remove('active');
+                    } else {
+                        this.elements.multiMatrixLabel.textContent = `Multi (${count})`;
+                        this.elements.multiMatrixDropdownBtn.classList.add('active');
+                    }
+                }
+            }
+
+            updateMultiMatrixVisualization() {
+                // Trigger matrix update with current selection
+                if (this.data && this.selectedMatrices.length > 0) {
+                    const stepData = this.data.steps[this.currentStep];
+                    const sampleData = {
+                        sequence: stepData.sequences[this.currentSample],
+                        scoreMatrix: stepData.score_matrices[this.currentSample],
+                        probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
+                        attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
+                        oracleMse: stepData.oracle_mses[this.currentSample]
+                    };
+                    this.updateMatrix(sampleData);
+                } else if (this.selectedMatrices.length === 0) {
+                    // Hide multi-matrix container when nothing selected
+                    this.elements.multiMatrixContainer?.classList.add('hidden');
+                    this.elements.singleMatrixContainer?.classList.remove('hidden');
+                    this.elements.dualMatrixContainer?.classList.add('hidden');
                 }
             }
 
@@ -3538,6 +3849,14 @@
                 // Show appropriate control (dropdown or single button)
                 this.showMatrixTypeControl(availableMatrixTypes);
 
+                // Populate and show multi-matrix dropdown if we have any alternative matrix types
+                if (availableMatrixTypes.length > 0) {
+                    this.elements.multiMatrixDropdownContainer?.classList.remove('hidden');
+                    this.populateMultiMatrixDropdown(availableMatrixTypes);
+                } else {
+                    this.elements.multiMatrixDropdownContainer?.classList.add('hidden');
+                }
+
                 // Show/hide stag and transition change charts based on data availability
                 const stagChangesSection = document.getElementById('stagChangesSection');
                 const transitionChangesSection = document.getElementById('transitionChangesSection');
@@ -3780,7 +4099,13 @@
             
             updateMatrix(sampleData) {
                 const matrixSection = document.querySelector('.score-matrix-section');
-                
+
+                // Check for multi-matrix mode first
+                if (this.selectedMatrices.length > 1) {
+                    this.renderMultiMatrices(sampleData);
+                    return;
+                }
+
                 if (this.matrixType === 'both' && (sampleData.probMatrix || sampleData.attributionMatrix || sampleData.stagScores || sampleData.transitionMatrix)) {
                     // Show both matrices - score + preferred secondary matrix
                     // Use user's preferred secondary matrix if available, otherwise fall back
@@ -3815,7 +4140,10 @@
                     }
                     this.elements.matrixTitle.textContent = `Score & ${secondaryTitle} Matrices`;
                     this.elements.singleMatrixContainer.classList.add('hidden');
+                    this.elements.dualMatrixContainer.classList.add('hidden');
+                    this.elements.multiMatrixContainer?.classList.add('hidden');
                     this.elements.dualMatrixContainer.classList.remove('hidden');
+                    matrixSection.classList.remove('multi-mode');
                     matrixSection.classList.add('dual-mode');
                     
                     // Add logo-mode class if in logo mode
@@ -3831,7 +4159,8 @@
                     // Show single matrix
                     this.elements.singleMatrixContainer.classList.remove('hidden');
                     this.elements.dualMatrixContainer.classList.add('hidden');
-                    matrixSection.classList.remove('dual-mode', 'logo-mode');
+                    this.elements.multiMatrixContainer?.classList.add('hidden');
+                    matrixSection.classList.remove('dual-mode', 'logo-mode', 'multi-mode');
                     
                     // Remove synchronized scrolling when switching to single mode
                     this.removeSynchronizedScrolling();
@@ -3970,11 +4299,156 @@
                         this.elements.probLogoContainer);
                     
                     // Set up synchronized scrolling for logos
-                    this.setupSynchronizedScrolling(this.elements.scoreLogoContainer.parentElement, 
+                    this.setupSynchronizedScrolling(this.elements.scoreLogoContainer.parentElement,
                         this.elements.probLogoContainer.parentElement);
                 }
             }
-            
+
+            renderMultiMatrices(sampleData) {
+                const matrixSection = document.querySelector('.score-matrix-section');
+
+                // Add multi-mode class to remove height constraints
+                matrixSection?.classList.remove('dual-mode');
+                matrixSection?.classList.add('multi-mode');
+
+                // Add logo-mode class if in logo mode
+                if (this.matrixMode === 'logo') {
+                    matrixSection?.classList.add('logo-mode');
+                } else {
+                    matrixSection?.classList.remove('logo-mode');
+                }
+
+                // Hide single and dual containers, show multi container
+                this.elements.singleMatrixContainer?.classList.add('hidden');
+                this.elements.dualMatrixContainer?.classList.add('hidden');
+                this.elements.multiMatrixContainer?.classList.remove('hidden');
+
+                // Update matrix title to show selected matrices
+                const matrixNames = this.selectedMatrices.map(type => {
+                    if (type === 'score') return 'Score';
+                    if (type === 'prob') return 'Probability';
+                    if (type === 'stag') return 'Stag';
+                    if (type === 'transition') return 'Transition';
+                    if (type === 'attribution') return 'Attribution';
+                    return type;
+                }).join(' & ');
+                this.elements.matrixTitle.textContent = `${matrixNames} Matrices`;
+
+                // Clear existing content
+                this.elements.multiMatrixContainer.innerHTML = '';
+
+                // Create a matrix section for each selected type
+                this.selectedMatrices.forEach((matrixType, index) => {
+                    const matrixDiv = document.createElement('div');
+                    matrixDiv.className = 'matrix-section';
+
+                    // Get the appropriate matrix data and title
+                    let matrixData, matrixTitle;
+                    if (matrixType === 'score') {
+                        matrixData = sampleData.scoreMatrix;
+                        matrixTitle = 'Score Matrix';
+                    } else if (matrixType === 'prob') {
+                        matrixData = sampleData.probMatrix;
+                        matrixTitle = 'Probability Matrix';
+                    } else if (matrixType === 'stag') {
+                        matrixData = sampleData.stagScores;
+                        matrixTitle = 'Stag Scores Matrix';
+                    } else if (matrixType === 'transition') {
+                        matrixData = sampleData.transitionMatrix;
+                        matrixTitle = 'Transition Matrix';
+                    } else if (matrixType === 'attribution') {
+                        matrixData = sampleData.attributionMatrix;
+                        matrixTitle = 'Attribution Matrix';
+                    }
+
+                    // Skip if matrix data not available
+                    if (!matrixData) return;
+
+                    // Create title
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'matrix-subtitle';
+                    titleDiv.textContent = matrixTitle;
+                    titleDiv.style.fontSize = '14px';
+                    titleDiv.style.fontWeight = 'bold';
+                    titleDiv.style.marginBottom = '10px';
+                    titleDiv.style.color = 'var(--text-primary)';
+                    matrixDiv.appendChild(titleDiv);
+
+                    // Create visualization container
+                    if (this.matrixMode === 'heatmap') {
+                        const heatmapContainer = document.createElement('div');
+                        heatmapContainer.className = 'heatmap-container';
+                        heatmapContainer.id = `multiHeatmap-${matrixType}-${index}`;
+                        matrixDiv.appendChild(heatmapContainer);
+
+                        const legendContainer = document.createElement('div');
+                        legendContainer.className = 'heatmap-legend';
+                        legendContainer.id = `multiLegend-${matrixType}-${index}`;
+                        matrixDiv.appendChild(legendContainer);
+
+                        this.elements.multiMatrixContainer.appendChild(matrixDiv);
+
+                        // Render heatmap
+                        this.updateHeatmapInContainer(matrixData, matrixType, heatmapContainer, legendContainer);
+                    } else {
+                        const logoContainer = document.createElement('div');
+                        logoContainer.className = 'logo-container';
+                        logoContainer.id = `multiLogo-${matrixType}-${index}`;
+
+                        const logoScrollContainer = document.createElement('div');
+                        logoScrollContainer.className = 'logo-scroll-container';
+                        logoScrollContainer.appendChild(logoContainer);
+                        matrixDiv.appendChild(logoScrollContainer);
+
+                        this.elements.multiMatrixContainer.appendChild(matrixDiv);
+
+                        // Render logo
+                        this.updateLogoInContainer(matrixData, matrixType, logoContainer);
+                    }
+                });
+
+                // Set up synchronized scrolling for all matrices
+                if (this.matrixMode === 'heatmap') {
+                    const heatmapContainers = Array.from(this.elements.multiMatrixContainer.querySelectorAll('.heatmap-container'));
+                    this.setupMultiSynchronizedScrolling(heatmapContainers);
+                } else {
+                    const logoScrollContainers = Array.from(this.elements.multiMatrixContainer.querySelectorAll('.logo-scroll-container'));
+                    this.setupMultiSynchronizedScrolling(logoScrollContainers);
+                }
+            }
+
+            setupMultiSynchronizedScrolling(containers) {
+                if (containers.length < 2) return;
+
+                // Remove any existing scroll listeners
+                this.removeSynchronizedScrolling();
+
+                // Store scroll handlers for cleanup
+                this.scrollHandlers = [];
+
+                // Create scroll handler for each container
+                containers.forEach((container, index) => {
+                    const handler = () => {
+                        if (!this.isScrollingSyncronized) {
+                            this.isScrollingSyncronized = true;
+                            const scrollLeft = container.scrollLeft;
+
+                            // Sync all other containers
+                            containers.forEach((otherContainer, otherIndex) => {
+                                if (otherIndex !== index) {
+                                    otherContainer.scrollLeft = scrollLeft;
+                                }
+                            });
+
+                            setTimeout(() => { this.isScrollingSyncronized = false; }, 10);
+                        }
+                    };
+
+                    container.addEventListener('scroll', handler);
+                    this.scrollHandlers.push({ element: container, handler });
+                });
+            }
+
             setupSynchronizedScrolling(container1, container2) {
                 // Remove any existing scroll listeners to avoid duplicates
                 this.removeSynchronizedScrolling();
