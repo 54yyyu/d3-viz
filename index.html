@@ -428,7 +428,89 @@
             background: var(--accent-primary);
             color: var(--bg-primary);
         }
-        
+
+        /* Matrix type dropdown styles */
+        .matrix-type-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .matrix-type-dropdown-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            padding-right: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 10px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .matrix-type-dropdown-btn:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .matrix-type-dropdown-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .matrix-type-dropdown-btn::after {
+            content: '▼';
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 8px;
+            opacity: 0.7;
+        }
+
+        .matrix-type-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-top: 4px;
+            min-width: 140px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+        }
+
+        .matrix-type-dropdown-menu.show {
+            display: block;
+        }
+
+        .matrix-type-dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .matrix-type-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .matrix-type-dropdown-item:hover {
+            background: var(--input-hover-bg);
+        }
+
+        .matrix-type-dropdown-item.selected {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            font-weight: 600;
+        }
+
         .matrix-display {
             overflow-x: auto;
             max-height: 250px; /* Much taller to accommodate larger logo */
@@ -1481,7 +1563,19 @@
                             <span id="matrixTitle">Score Matrix</span>
                             <div class="matrix-controls">
                                 <button class="toggle-btn active" data-type="score">Score</button>
-                                <button class="toggle-btn" data-type="prob">Prob</button>
+                                <!-- Matrix type dropdown for prob/stag/transition/attribution -->
+                                <div class="matrix-type-dropdown hidden" id="matrixTypeDropdownContainer">
+                                    <button class="matrix-type-dropdown-btn" id="matrixTypeDropdownBtn">
+                                        <span id="matrixTypeLabel">Matrix Type</span>
+                                    </button>
+                                    <div class="matrix-type-dropdown-menu" id="matrixTypeDropdownMenu">
+                                        <!-- Dropdown items will be populated dynamically -->
+                                    </div>
+                                </div>
+                                <!-- Fallback single buttons (shown when only one type available) -->
+                                <button class="toggle-btn hidden" id="probBtn" data-type="prob">Prob</button>
+                                <button class="toggle-btn hidden" id="stagBtn" data-type="stag">Stag</button>
+                                <button class="toggle-btn hidden" id="transitionBtn" data-type="transition">Transition</button>
                                 <button class="toggle-btn hidden" id="attributionBtn" data-type="attribution">Attribution</button>
                                 <button class="toggle-btn" data-type="both">Both</button>
                                 <button class="toggle-btn active" data-mode="heatmap">Heatmap</button>
@@ -1553,7 +1647,22 @@
                             <canvas id="rateChart"></canvas>
                         </div>
                     </div>
-                    
+
+                    <!-- Conditional charts for stag scores and transition matrices -->
+                    <div class="viz-section hidden" id="stagChangesSection">
+                        <div class="viz-title">Stag Score Changes vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="stagChangesChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="viz-section hidden" id="transitionChangesSection">
+                        <div class="viz-title">Transition Matrix Changes vs Steps</div>
+                        <div class="chart-container">
+                            <canvas id="transitionChangesChart"></canvas>
+                        </div>
+                    </div>
+
                     <!-- Prediction plot sections will be dynamically inserted after this point -->
                 </div>
             </div>
@@ -1760,6 +1869,15 @@
                     logoWidth: document.getElementById('logoWidth'),
                     logoHeight: document.getElementById('logoHeight'),
                     logoDownload: document.getElementById('logoDownload'),
+                    // Matrix type dropdown elements
+                    matrixTypeDropdownContainer: document.getElementById('matrixTypeDropdownContainer'),
+                    matrixTypeDropdownBtn: document.getElementById('matrixTypeDropdownBtn'),
+                    matrixTypeLabel: document.getElementById('matrixTypeLabel'),
+                    matrixTypeDropdownMenu: document.getElementById('matrixTypeDropdownMenu'),
+                    probBtn: document.getElementById('probBtn'),
+                    stagBtn: document.getElementById('stagBtn'),
+                    transitionBtn: document.getElementById('transitionBtn'),
+                    attributionBtn: document.getElementById('attributionBtn'),
                     // TOMTOM elements
                     tomtomPanel: document.getElementById('tomtomPanel'),
                     tomtomToggle: document.getElementById('tomtomToggle'),
@@ -1814,7 +1932,10 @@
                 this.elements.logoWidth.addEventListener('input', () => this.updateLogoSizing());
                 this.elements.logoHeight.addEventListener('input', () => this.updateLogoSizing());
                 this.elements.logoDownload.addEventListener('click', () => this.downloadLogo());
-                
+
+                // Matrix type dropdown controls
+                this.setupMatrixTypeDropdown();
+
                 // Keyboard navigation
                 document.addEventListener('keydown', (e) => this.handleKeydown(e));
                 
@@ -1870,7 +1991,101 @@
                         break;
                 }
             }
-            
+
+            setupMatrixTypeDropdown() {
+                // Setup dropdown toggle
+                if (this.elements.matrixTypeDropdownBtn) {
+                    this.elements.matrixTypeDropdownBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.elements.matrixTypeDropdownMenu.classList.toggle('show');
+                    });
+                }
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.elements.matrixTypeDropdownContainer?.contains(e.target)) {
+                        this.elements.matrixTypeDropdownMenu?.classList.remove('show');
+                    }
+                });
+            }
+
+            populateMatrixTypeDropdown(availableTypes) {
+                // availableTypes is an array of {type: 'prob'|'stag'|'transition'|'attribution', label: 'Probability'}
+                if (!this.elements.matrixTypeDropdownMenu) return;
+
+                // Clear existing items
+                this.elements.matrixTypeDropdownMenu.innerHTML = '';
+
+                // Add dropdown items
+                availableTypes.forEach(typeInfo => {
+                    const item = document.createElement('div');
+                    item.className = 'matrix-type-dropdown-item';
+                    item.textContent = typeInfo.label;
+                    item.dataset.type = typeInfo.type;
+
+                    item.addEventListener('click', () => {
+                        this.setMatrixType(typeInfo.type);
+                        this.updateMatrixTypeDropdownSelection(typeInfo.type);
+                        this.elements.matrixTypeDropdownMenu.classList.remove('show');
+                    });
+
+                    this.elements.matrixTypeDropdownMenu.appendChild(item);
+                });
+            }
+
+            updateMatrixTypeDropdownSelection(selectedType) {
+                // Update dropdown button label and item selection
+                const items = this.elements.matrixTypeDropdownMenu?.querySelectorAll('.matrix-type-dropdown-item');
+                items?.forEach(item => {
+                    if (item.dataset.type === selectedType) {
+                        item.classList.add('selected');
+                        this.elements.matrixTypeLabel.textContent = item.textContent;
+                        this.elements.matrixTypeDropdownBtn.classList.add('active');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+            }
+
+            showMatrixTypeControl(availableTypes) {
+                // availableTypes is an array of type info objects
+                // Show dropdown if multiple types, show single button if only one type
+
+                // Hide all first
+                this.elements.matrixTypeDropdownContainer?.classList.add('hidden');
+                this.elements.probBtn?.classList.add('hidden');
+                this.elements.stagBtn?.classList.add('hidden');
+                this.elements.transitionBtn?.classList.add('hidden');
+                this.elements.attributionBtn?.classList.add('hidden');
+
+                if (availableTypes.length === 0) {
+                    // No alternative matrix types available
+                    return;
+                } else if (availableTypes.length === 1) {
+                    // Show single button
+                    const singleType = availableTypes[0];
+                    const buttonMap = {
+                        'prob': this.elements.probBtn,
+                        'stag': this.elements.stagBtn,
+                        'transition': this.elements.transitionBtn,
+                        'attribution': this.elements.attributionBtn
+                    };
+                    const button = buttonMap[singleType.type];
+                    if (button) {
+                        button.classList.remove('hidden');
+                    }
+                } else {
+                    // Show dropdown with multiple options
+                    this.elements.matrixTypeDropdownContainer?.classList.remove('hidden');
+                    this.populateMatrixTypeDropdown(availableTypes);
+
+                    // Set initial selection
+                    if (availableTypes.length > 0) {
+                        this.updateMatrixTypeDropdownSelection(availableTypes[0].type);
+                    }
+                }
+            }
+
             setupViewportSizing() {
                 this.updateViewportSizes();
             }
@@ -1910,9 +2125,11 @@
                     scoreMatrix: stepData.score_matrices[this.currentSample],
                     probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                     attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                    stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                    transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                     oracleMse: stepData.oracle_mses[this.currentSample]
                 };
-                
+
                 // Force refresh of matrix/logo visualizations
                 this.updateMatrix(sampleData);
                 
@@ -2389,6 +2606,8 @@
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                         attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -3253,6 +3472,8 @@
                                 score_matrices: Array.from(step.get('score_matrix').value),
                                 prob_matrices: step.has('prob_matrix') ? Array.from(step.get('prob_matrix').value) : null,
                                 attribution_matrices: step.has('attribution_matrix') ? Array.from(step.get('attribution_matrix').value) : null,
+                                stag_scores: step.has('stag_scores') ? Array.from(step.get('stag_scores').value) : null,
+                                transition_matrices: step.has('transition_matrices') ? Array.from(step.get('transition_matrices').value) : null,
                                 oracle_mses: step.has('oracle_mse') ? Array.from(step.get('oracle_mse').value) : []
                             };
                             steps.push(stepData);
@@ -3295,18 +3516,46 @@
                     this.elements.originalSequenceSection.style.display = 'none';
                 }
                 
-                // Show/hide attribution button based on data availability
-                // When attribution is available, show Score, Prob, and Attribution buttons
-                const attributionBtn = document.getElementById('attributionBtn');
-                const probBtn = document.querySelector('[data-type="prob"]');
-                if (this.data.steps && this.data.steps.length > 0 && this.data.steps[0].attribution_matrices) {
-                    attributionBtn.classList.remove('hidden');
-                    probBtn.classList.remove('hidden'); // Keep prob button visible when attribution is available
-                } else {
-                    attributionBtn.classList.add('hidden');
-                    probBtn.classList.remove('hidden'); // Show prob button when attribution is not available
+                // Detect available alternative matrix types and setup controls
+                const availableMatrixTypes = [];
+                if (this.data.steps && this.data.steps.length > 0) {
+                    const firstStep = this.data.steps[0];
+
+                    if (firstStep.prob_matrices) {
+                        availableMatrixTypes.push({ type: 'prob', label: 'Probability' });
+                    }
+                    if (firstStep.stag_scores) {
+                        availableMatrixTypes.push({ type: 'stag', label: 'Stag Scores' });
+                    }
+                    if (firstStep.transition_matrices) {
+                        availableMatrixTypes.push({ type: 'transition', label: 'Transition' });
+                    }
+                    if (firstStep.attribution_matrices) {
+                        availableMatrixTypes.push({ type: 'attribution', label: 'Attribution' });
+                    }
                 }
-                
+
+                // Show appropriate control (dropdown or single button)
+                this.showMatrixTypeControl(availableMatrixTypes);
+
+                // Show/hide stag and transition change charts based on data availability
+                const stagChangesSection = document.getElementById('stagChangesSection');
+                const transitionChangesSection = document.getElementById('transitionChangesSection');
+                if (stagChangesSection) {
+                    if (this.data.steps && this.data.steps.length > 0 && this.data.steps[0].stag_scores) {
+                        stagChangesSection.classList.remove('hidden');
+                    } else {
+                        stagChangesSection.classList.add('hidden');
+                    }
+                }
+                if (transitionChangesSection) {
+                    if (this.data.steps && this.data.steps.length > 0 && this.data.steps[0].transition_matrices) {
+                        transitionChangesSection.classList.remove('hidden');
+                    } else {
+                        transitionChangesSection.classList.add('hidden');
+                    }
+                }
+
                 // Set up prediction plots sections based on data availability
                 if (this.data.metadata.ground_truth_labels && 
                     this.data.steps && this.data.steps.length > 0 && 
@@ -3407,6 +3656,8 @@
                     scoreMatrix: stepData.score_matrices[this.currentSample],
                     probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                     attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                    stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                    transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                     oracleMse: stepData.oracle_mses[this.currentSample]
                 };
                 
@@ -3491,6 +3742,8 @@
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                         attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -3528,7 +3781,7 @@
             updateMatrix(sampleData) {
                 const matrixSection = document.querySelector('.score-matrix-section');
                 
-                if (this.matrixType === 'both' && (sampleData.probMatrix || sampleData.attributionMatrix)) {
+                if (this.matrixType === 'both' && (sampleData.probMatrix || sampleData.attributionMatrix || sampleData.stagScores || sampleData.transitionMatrix)) {
                     // Show both matrices - score + preferred secondary matrix
                     // Use user's preferred secondary matrix if available, otherwise fall back
                     let secondaryMatrixType, secondaryTitle;
@@ -3538,10 +3791,27 @@
                     } else if (this.preferredSecondaryMatrix === 'prob' && sampleData.probMatrix) {
                         secondaryMatrixType = 'prob';
                         secondaryTitle = 'Probability';
+                    } else if (this.preferredSecondaryMatrix === 'stag' && sampleData.stagScores) {
+                        secondaryMatrixType = 'stag';
+                        secondaryTitle = 'Stag Scores';
+                    } else if (this.preferredSecondaryMatrix === 'transition' && sampleData.transitionMatrix) {
+                        secondaryMatrixType = 'transition';
+                        secondaryTitle = 'Transition';
                     } else {
-                        // Fallback: use whatever is available
-                        secondaryMatrixType = sampleData.attributionMatrix ? 'attribution' : 'prob';
-                        secondaryTitle = sampleData.attributionMatrix ? 'Attribution' : 'Probability';
+                        // Fallback: use whatever is available (in order of preference)
+                        if (sampleData.attributionMatrix) {
+                            secondaryMatrixType = 'attribution';
+                            secondaryTitle = 'Attribution';
+                        } else if (sampleData.probMatrix) {
+                            secondaryMatrixType = 'prob';
+                            secondaryTitle = 'Probability';
+                        } else if (sampleData.stagScores) {
+                            secondaryMatrixType = 'stag';
+                            secondaryTitle = 'Stag Scores';
+                        } else {
+                            secondaryMatrixType = 'transition';
+                            secondaryTitle = 'Transition';
+                        }
                     }
                     this.elements.matrixTitle.textContent = `Score & ${secondaryTitle} Matrices`;
                     this.elements.singleMatrixContainer.classList.add('hidden');
@@ -3567,26 +3837,28 @@
                     this.removeSynchronizedScrolling();
                     
                     // Determine which matrix to use
-                    // When attribution is available, treat 'prob' selection as 'attribution'
                     let currentMatrix;
                     let effectiveMatrixType = this.matrixType;
-                    
-                    // If user selected 'prob' but attribution is available (and prob is not), use attribution
-                    if (this.matrixType === 'prob' && sampleData.attributionMatrix && !sampleData.probMatrix) {
-                        effectiveMatrixType = 'attribution';
-                    }
-                    
+
+                    // Select the appropriate matrix based on type
                     if (effectiveMatrixType === 'prob' && sampleData.probMatrix) {
                         currentMatrix = sampleData.probMatrix;
                         this.elements.matrixTitle.textContent = 'Probability Matrix';
                     } else if (effectiveMatrixType === 'attribution' && sampleData.attributionMatrix) {
                         currentMatrix = sampleData.attributionMatrix;
                         this.elements.matrixTitle.textContent = 'Attribution Matrix';
+                    } else if (effectiveMatrixType === 'stag' && sampleData.stagScores) {
+                        currentMatrix = sampleData.stagScores;
+                        this.elements.matrixTitle.textContent = 'Stag Scores Matrix';
+                    } else if (effectiveMatrixType === 'transition' && sampleData.transitionMatrix) {
+                        currentMatrix = sampleData.transitionMatrix;
+                        this.elements.matrixTitle.textContent = 'Transition Matrix';
                     } else {
+                        // Fall back to score matrix if selected type not available
                         currentMatrix = sampleData.scoreMatrix;
                         this.elements.matrixTitle.textContent = 'Score Matrix';
-                        // If prob or attribution was selected but not available, fall back to score
-                        if (this.matrixType === 'prob' || this.matrixType === 'attribution') {
+                        // If a specific type was selected but not available, fall back to score
+                        if (this.matrixType !== 'score' && this.matrixType !== 'both') {
                             this.setMatrixType('score');
                         }
                     }
@@ -3601,17 +3873,25 @@
             
             setMatrixType(type) {
                 this.matrixType = type;
-                
+
                 // Track preferred secondary matrix for Both mode
-                if (type === 'prob' || type === 'attribution') {
+                if (type === 'prob' || type === 'attribution' || type === 'stag' || type === 'transition') {
                     this.preferredSecondaryMatrix = type;
                 }
-                
-                // Update button states for matrix type
+
+                // Update button states for matrix type (single buttons)
                 document.querySelectorAll('.toggle-btn[data-type]').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.type === type);
                 });
-                
+
+                // Update dropdown selection if dropdown is visible
+                if (!this.elements.matrixTypeDropdownContainer?.classList.contains('hidden')) {
+                    this.updateMatrixTypeDropdownSelection(type);
+                } else {
+                    // If using single buttons, deactivate dropdown button
+                    this.elements.matrixTypeDropdownBtn?.classList.remove('active');
+                }
+
                 // Update visualization if data is available
                 if (this.data) {
                     const stepData = this.data.steps[this.currentStep];
@@ -3620,6 +3900,8 @@
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                         attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -3627,12 +3909,27 @@
             }
             
             updateDualMatrices(sampleData, secondaryMatrixType = 'prob') {
-                const secondaryMatrix = secondaryMatrixType === 'attribution' ? sampleData.attributionMatrix : sampleData.probMatrix;
-                
+                // Get the appropriate secondary matrix based on type
+                let secondaryMatrix;
+                let secondaryTitle;
+                if (secondaryMatrixType === 'attribution') {
+                    secondaryMatrix = sampleData.attributionMatrix;
+                    secondaryTitle = 'Attribution Matrix';
+                } else if (secondaryMatrixType === 'stag') {
+                    secondaryMatrix = sampleData.stagScores;
+                    secondaryTitle = 'Stag Scores Matrix';
+                } else if (secondaryMatrixType === 'transition') {
+                    secondaryMatrix = sampleData.transitionMatrix;
+                    secondaryTitle = 'Transition Matrix';
+                } else {
+                    secondaryMatrix = sampleData.probMatrix;
+                    secondaryTitle = 'Probability Matrix';
+                }
+
                 // Update the subtitle of the second matrix
                 const probMatrixSubtitle = document.querySelector('.matrix-section:last-child .matrix-subtitle');
                 if (probMatrixSubtitle) {
-                    probMatrixSubtitle.textContent = secondaryMatrixType === 'attribution' ? 'Attribution Matrix' : 'Probability Matrix';
+                    probMatrixSubtitle.textContent = secondaryTitle;
                 }
                 
                 if (this.matrixMode === 'heatmap') {
@@ -3743,6 +4040,16 @@
                     colorScale = d3.scaleSequential(d3.interpolateRdBu)
                         .domain([1, -1]); // Blue for negative attribution, red for positive
                     valueLabel = 'Attribution';
+                } else if (matrixType === 'stag') {
+                    // For stag scores: similar to probability (0 to 1 range typically)
+                    colorScale = d3.scaleSequential(d3.interpolateRdBu)
+                        .domain([1, 0]); // 1=red (high), 0=blue (low)
+                    valueLabel = 'Stag Score';
+                } else if (matrixType === 'transition') {
+                    // For transition matrix: probability-like (0 to 1)
+                    colorScale = d3.scaleSequential(d3.interpolateRdBu)
+                        .domain([1, 0]); // 1=red (high transition prob), 0=blue (low)
+                    valueLabel = 'Transition Probability';
                 } else {
                     // For score matrix: keep original scale
                     colorScale = d3.scaleSequential(d3.interpolateRdBu)
@@ -4404,6 +4711,8 @@
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                         attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
@@ -4511,6 +4820,36 @@
                 } catch (error) {
                     console.warn('Failed to initialize changes chart:', error);
                 }
+
+                // Initialize conditional charts (stag and transition) only if data is available
+                // These will be shown/hidden based on data availability in initializeVisualization
+                try {
+                    // Stag Score Changes Chart
+                    const stagChangesElement = document.getElementById('stagChangesChart');
+                    if (stagChangesElement) {
+                        this.charts.stagChanges = new Chart(stagChangesElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize stag changes chart:', error);
+                }
+
+                try {
+                    // Transition Matrix Changes Chart
+                    const transitionChangesElement = document.getElementById('transitionChangesChart');
+                    if (transitionChangesElement) {
+                        this.charts.transitionChanges = new Chart(transitionChangesElement, {
+                            type: 'line',
+                            data: { datasets: [] },
+                            options: getChartOptions()
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize transition changes chart:', error);
+                }
             }
             
             calculateNucleotideChanges(sampleIndex) {
@@ -4601,7 +4940,135 @@
                 
                 return changes;
             }
-            
+
+            calculateStagChanges(sampleIndex) {
+                if (!this.data || this.data.steps.length < 2) return [];
+
+                // Check if stag_scores data is available
+                if (!this.data.steps[0].stag_scores) return [];
+
+                const changes = [];
+
+                // First step has no previous step to compare to, so 0 change
+                changes.push(0);
+
+                // Calculate stag score changes for each subsequent step
+                for (let stepIndex = 1; stepIndex < this.data.steps.length; stepIndex++) {
+                    const currentStagMatrix = this.data.steps[stepIndex].stag_scores[sampleIndex];
+                    const previousStagMatrix = this.data.steps[stepIndex - 1].stag_scores[sampleIndex];
+
+                    let totalChange = 0;
+                    let positionCount = 0;
+
+                    // Compare each base pair position
+                    for (let i = 0; i < currentStagMatrix.length; i++) {
+                        // Get raw stag scores for this position
+                        const currentRaw = [
+                            currentStagMatrix[i][0] || 0,
+                            currentStagMatrix[i][1] || 0,
+                            currentStagMatrix[i][2] || 0,
+                            currentStagMatrix[i][3] || 0
+                        ];
+                        const previousRaw = [
+                            previousStagMatrix[i][0] || 0,
+                            previousStagMatrix[i][1] || 0,
+                            previousStagMatrix[i][2] || 0,
+                            previousStagMatrix[i][3] || 0
+                        ];
+
+                        // Normalize to probabilities for comparison
+                        const currentSum = currentRaw.reduce((a, b) => a + Math.max(0, b), 0);
+                        const previousSum = previousRaw.reduce((a, b) => a + Math.max(0, b), 0);
+
+                        const currentNorm = currentSum > 0 ?
+                            currentRaw.map(val => Math.max(0, val) / currentSum) :
+                            [0.25, 0.25, 0.25, 0.25];
+                        const previousNorm = previousSum > 0 ?
+                            previousRaw.map(val => Math.max(0, val) / previousSum) :
+                            [0.25, 0.25, 0.25, 0.25];
+
+                        // Calculate position change
+                        let positionChange = 0;
+                        for (let j = 0; j < 4; j++) {
+                            positionChange += Math.abs(currentNorm[j] - previousNorm[j]);
+                        }
+
+                        totalChange += positionChange;
+                        positionCount++;
+                    }
+
+                    // Calculate average change across all positions
+                    const averageChange = positionCount > 0 ? totalChange / positionCount : 0;
+                    changes.push(averageChange);
+                }
+
+                return changes;
+            }
+
+            calculateTransitionChanges(sampleIndex) {
+                if (!this.data || this.data.steps.length < 2) return [];
+
+                // Check if transition_matrices data is available
+                if (!this.data.steps[0].transition_matrices) return [];
+
+                const changes = [];
+
+                // First step has no previous step to compare to, so 0 change
+                changes.push(0);
+
+                // Calculate transition matrix changes for each subsequent step
+                for (let stepIndex = 1; stepIndex < this.data.steps.length; stepIndex++) {
+                    const currentTransitionMatrix = this.data.steps[stepIndex].transition_matrices[sampleIndex];
+                    const previousTransitionMatrix = this.data.steps[stepIndex - 1].transition_matrices[sampleIndex];
+
+                    let totalChange = 0;
+                    let positionCount = 0;
+
+                    // Compare each base pair position
+                    for (let i = 0; i < currentTransitionMatrix.length; i++) {
+                        // Get raw transition probabilities for this position
+                        const currentRaw = [
+                            currentTransitionMatrix[i][0] || 0,
+                            currentTransitionMatrix[i][1] || 0,
+                            currentTransitionMatrix[i][2] || 0,
+                            currentTransitionMatrix[i][3] || 0
+                        ];
+                        const previousRaw = [
+                            previousTransitionMatrix[i][0] || 0,
+                            previousTransitionMatrix[i][1] || 0,
+                            previousTransitionMatrix[i][2] || 0,
+                            previousTransitionMatrix[i][3] || 0
+                        ];
+
+                        // Normalize to probabilities for comparison
+                        const currentSum = currentRaw.reduce((a, b) => a + Math.max(0, b), 0);
+                        const previousSum = previousRaw.reduce((a, b) => a + Math.max(0, b), 0);
+
+                        const currentNorm = currentSum > 0 ?
+                            currentRaw.map(val => Math.max(0, val) / currentSum) :
+                            [0.25, 0.25, 0.25, 0.25];
+                        const previousNorm = previousSum > 0 ?
+                            previousRaw.map(val => Math.max(0, val) / previousSum) :
+                            [0.25, 0.25, 0.25, 0.25];
+
+                        // Calculate position change
+                        let positionChange = 0;
+                        for (let j = 0; j < 4; j++) {
+                            positionChange += Math.abs(currentNorm[j] - previousNorm[j]);
+                        }
+
+                        totalChange += positionChange;
+                        positionCount++;
+                    }
+
+                    // Calculate average change across all positions
+                    const averageChange = positionCount > 0 ? totalChange / positionCount : 0;
+                    changes.push(averageChange);
+                }
+
+                return changes;
+            }
+
             updateCharts() {
                 if (!this.data) return;
                 
@@ -4674,7 +5141,45 @@
                         }]
                     };
                 }
-                
+
+                // Update Stag Score Changes chart (if available)
+                if (this.charts.stagChanges) {
+                    const stagChangeData = this.calculateStagChanges(this.currentSample);
+                    if (stagChangeData && stagChangeData.length > 0) {
+                        this.charts.stagChanges.data = {
+                            labels: steps,
+                            datasets: [{
+                                data: stagChangeData,
+                                borderColor: '#9b59b6',
+                                backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        };
+                    }
+                }
+
+                // Update Transition Matrix Changes chart (if available)
+                if (this.charts.transitionChanges) {
+                    const transitionChangeData = this.calculateTransitionChanges(this.currentSample);
+                    if (transitionChangeData && transitionChangeData.length > 0) {
+                        this.charts.transitionChanges.data = {
+                            labels: steps,
+                            datasets: [{
+                                data: transitionChangeData,
+                                borderColor: '#e67e22',
+                                backgroundColor: 'rgba(230, 126, 34, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        };
+                    }
+                }
+
                 // Update all charts (excluding predictions object)
                 if (this.charts) {
                     Object.entries(this.charts).forEach(([key, chart]) => {
@@ -5049,6 +5554,8 @@
                         scoreMatrix: stepData.score_matrices[this.currentSample],
                         probMatrix: stepData.prob_matrices ? stepData.prob_matrices[this.currentSample] : null,
                         attributionMatrix: stepData.attribution_matrices ? stepData.attribution_matrices[this.currentSample] : null,
+                        stagScores: stepData.stag_scores ? stepData.stag_scores[this.currentSample] : null,
+                        transitionMatrix: stepData.transition_matrices ? stepData.transition_matrices[this.currentSample] : null,
                         oracleMse: stepData.oracle_mses[this.currentSample]
                     };
                     this.updateMatrix(sampleData);
