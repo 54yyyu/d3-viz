@@ -917,7 +917,35 @@
         .file-input:hover::before {
             left: 100%;
         }
-        
+
+        .demo-btn {
+            background: transparent;
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         /* Scrollbar Styles */
         ::-webkit-scrollbar {
             width: 8px;
@@ -1652,6 +1680,9 @@
                 <button class="theme-toggle" id="themeToggle" title="Toggle Light/Dark Mode">
                     <span id="themeIcon">☀️</span>
                 </button>
+                <button class="demo-btn" id="loadDemoBtn" title="Load example DeepSTARR data with JASPAR motif database">
+                    Try Example
+                </button>
                 <input type="file" id="fileInput" accept=".h5,.hdf5,.json" style="display: none;">
                 <button class="file-input" onclick="document.getElementById('fileInput').click()">
                     Load Data
@@ -1991,6 +2022,7 @@
             initializeElements() {
                 this.elements = {
                     fileInput: document.getElementById('fileInput'),
+                    loadDemoBtn: document.getElementById('loadDemoBtn'),
                     sampleList: document.getElementById('sampleList'),
                     datasetInfo: document.getElementById('datasetInfo'),
                     mainContent: document.getElementById('mainContent'),
@@ -2078,6 +2110,7 @@
             
             setupEventListeners() {
                 this.elements.fileInput.addEventListener('change', (e) => this.handleFileLoad(e));
+                this.elements.loadDemoBtn.addEventListener('click', () => this.loadDemoData());
                 this.elements.stepSlider.addEventListener('input', (e) => this.setStep(parseInt(e.target.value)));
                 this.elements.playBtn.addEventListener('click', () => this.togglePlay());
                 this.elements.prevBtn.addEventListener('click', () => this.previousStep());
@@ -3701,7 +3734,77 @@
                 
                 return logoData;
             }
-            
+
+            async loadDemoData() {
+                const btn = this.elements.loadDemoBtn;
+                const originalText = btn.textContent;
+
+                try {
+                    btn.disabled = true;
+                    btn.textContent = 'Loading...';
+                    this.elements.sampleList.innerHTML = '<div class="loading">Loading demo data...</div>';
+
+                    // Fetch both files in parallel
+                    const [jsonResponse, memeResponse] = await Promise.all([
+                        fetch('data_demo/deepstarr_evaluation_visualization_data_shap_hk.json'),
+                        fetch('data_demo/JASPAR2024_CORE_non-redundant_pfms_meme.txt')
+                    ]);
+
+                    if (!jsonResponse.ok) {
+                        throw new Error('Failed to load demo JSON data');
+                    }
+                    if (!memeResponse.ok) {
+                        throw new Error('Failed to load demo MEME database');
+                    }
+
+                    // Parse the data
+                    const jsonData = await jsonResponse.json();
+                    const memeText = await memeResponse.text();
+
+                    // Validate JSON structure
+                    if (!jsonData.metadata || !jsonData.steps) {
+                        throw new Error('Invalid demo data format');
+                    }
+
+                    // Validate MEME format
+                    if (!this.validateMemeFormat(memeText)) {
+                        throw new Error('Invalid MEME database format');
+                    }
+
+                    // Set the data
+                    this.data = jsonData;
+                    this.uploadedDatabase = memeText;
+
+                    // Update the database upload UI
+                    try {
+                        const memeSuite = new MemeSuiteLite();
+                        const motifs = memeSuite.readMeme(memeText);
+                        const motifCount = Object.keys(motifs).length;
+                        this.elements.databaseFileName.textContent = `JASPAR2024_CORE (${motifCount} motifs)`;
+                    } catch (error) {
+                        this.elements.databaseFileName.textContent = 'JASPAR2024_CORE_non-redundant_pfms_meme.txt';
+                    }
+                    this.elements.databaseUpload.classList.add('has-file');
+                    this.updateRunButtonState();
+
+                    // Initialize visualization
+                    this.initializeVisualization();
+
+                    btn.textContent = 'Demo Loaded';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('Error loading demo data:', error);
+                    alert('Error loading demo data: ' + error.message);
+                    this.elements.sampleList.innerHTML = '<div class="loading">Load a data file to begin</div>';
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }
+
             async handleFileLoad(event) {
                 const file = event.target.files[0];
                 if (!file) return;
